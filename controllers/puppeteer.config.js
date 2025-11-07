@@ -112,44 +112,13 @@ async function getBrowserConfig() {
   }
 
   throw new Error(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-❌ Chrome/Chromium Not Found
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Chrome/Chromium Not Found
 
 Chrome/Chromium is not installed or not accessible.
 
-🔧 FIXES:
-
-1. Verify Aptfile exists in project root with chromium
-2. Clear Render build cache and redeploy
-3. Check Render build logs for Aptfile installation
-
-📝 Searched locations:
+Searched locations:
 ${systemPaths.map(p => `   - ${p}`).join('\n')}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   `);
 }
 
 module.exports = { getBrowserConfig };
-```
-
-### **Step 2: Verify Your `Aptfile` Exists**
-
-Make sure you have this **exact file** in your project root (same level as `package.json`):
-
-**Filename: `Aptfile`** (no extension!)
-```
-chromium
-fonts-liberation
-libnss3
-libatk-bridge2.0-0
-libdrm2
-libxkbcommon0
-libxcomposite1
-libxdamage1
-libxfixes3
-libxrandr2
-libgbm1
-libasound2
-libpangocairo-1.0-0
-libgtk-3-0
