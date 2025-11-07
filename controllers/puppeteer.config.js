@@ -1,103 +1,80 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const path = require('path');
 
 async function getBrowserConfig() {
   console.log('🔍 Searching for Chrome/Chromium...');
   
-  // Method 1: Try Puppeteer's bundled Chrome first
-  try {
-    const executablePath = puppeteer.executablePath();
-    console.log('📍 Puppeteer executable path:', executablePath);
-    
-    if (fs.existsSync(executablePath)) {
+  // Method 1: Check project src/chrome directory (where @puppeteer/browsers installs)
+  const projectRoot = process.cwd();
+  const chromePaths = [
+    path.join(projectRoot, 'src', 'chrome'),
+    path.join(projectRoot, 'chrome'),
+    path.join(projectRoot, '.cache', 'puppeteer'),
+  ];
+  
+  console.log('📂 Project root:', projectRoot);
+  console.log('📂 Checking Chrome paths:', chromePaths);
+  
+  for (const chromeDir of chromePaths) {
+    if (fs.existsSync(chromeDir)) {
+      console.log('✅ Found Chrome directory:', chromeDir);
+      
       try {
-        fs.accessSync(executablePath, fs.constants.X_OK);
-        console.log('✅ Found and verified Puppeteer bundled Chrome!');
-        return {
-          executablePath,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-extensions',
-          ],
-          headless: 'new'
-        };
-      } catch (accessError) {
-        console.log('⚠️  Chrome found but not executable:', accessError.message);
-      }
-    } else {
-      console.log('⚠️  Path does not exist:', executablePath);
-    }
-  } catch (error) {
-    console.log('⚠️  Puppeteer executablePath error:', error.message);
-  }
-
-  // Method 2: Check system paths with actual file existence verification
-  const systemPaths = [
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-    '/snap/bin/chromium',
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-  ].filter(Boolean);
-
-  console.log('🔍 Checking system paths...');
-
-  for (const chromePath of systemPaths) {
-    console.log(`   Checking: ${chromePath}`);
-    try {
-      if (fs.existsSync(chromePath)) {
-        const stats = fs.statSync(chromePath);
-        console.log(`   ✓ File exists (size: ${stats.size} bytes)`);
+        // Find chrome executable recursively
+        const findCmd = `find "${chromeDir}" -name chrome -type f -executable 2>/dev/null || true`;
+        console.log('🔍 Running:', findCmd);
         
-        try {
-          fs.accessSync(chromePath, fs.constants.X_OK);
-          console.log(`   ✓ File is executable`);
+        const result = execSync(findCmd).toString().trim();
+        const chromeExecutables = result.split('\n').filter(Boolean);
+        
+        console.log('📝 Found executables:', chromeExecutables);
+        
+        if (chromeExecutables.length > 0) {
+          const chromePath = chromeExecutables[0];
           console.log('✅ Using Chrome at:', chromePath);
           
-          return {
-            executablePath: chromePath,
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-gpu',
-              '--no-first-run',
-              '--no-zygote',
-              '--single-process',
-            ],
-            headless: 'new'
-          };
-        } catch (accessError) {
-          console.log(`   ✗ File not executable:`, accessError.message);
+          // Verify it's executable
+          try {
+            fs.accessSync(chromePath, fs.constants.X_OK);
+            console.log('✅ Chrome is executable!');
+            
+            return {
+              executablePath: chromePath,
+              args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-extensions',
+              ],
+              headless: 'new'
+            };
+          } catch (err) {
+            console.log('⚠️  Chrome not executable:', err.message);
+          }
         }
-      } else {
-        console.log(`   ✗ File does not exist`);
+      } catch (error) {
+        console.log('⚠️  Error searching directory:', error.message);
       }
-    } catch (error) {
-      console.log(`   ✗ Error checking path:`, error.message);
+    } else {
+      console.log('⚠️  Directory does not exist:', chromeDir);
     }
   }
-
-  // Method 3: Try to find Chrome using 'which' command
-  console.log('🔍 Trying to locate Chrome using system commands...');
+  
+  // Method 2: Try puppeteer.executablePath()
   try {
-    const whichResult = execSync('which chromium chromium-browser google-chrome 2>/dev/null || true')
-      .toString()
-      .trim();
+    const executablePath = puppeteer.executablePath();
+    console.log('📍 Puppeteer executablePath():', executablePath);
     
-    if (whichResult) {
-      const foundPath = whichResult.split('\n')[0];
-      console.log('✅ Found Chrome via which:', foundPath);
+    if (fs.existsSync(executablePath)) {
+      console.log('✅ Found Chrome via puppeteer.executablePath()');
       return {
-        executablePath: foundPath,
+        executablePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -108,16 +85,41 @@ async function getBrowserConfig() {
       };
     }
   } catch (error) {
-    console.log('⚠️  which command failed:', error.message);
+    console.log('⚠️  puppeteer.executablePath() error:', error.message);
+  }
+
+  // Method 3: System paths
+  const systemPaths = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+  ];
+
+  console.log('🔍 Checking system paths...');
+  for (const chromePath of systemPaths) {
+    if (fs.existsSync(chromePath)) {
+      console.log('✅ Found system Chrome:', chromePath);
+      return {
+        executablePath: chromePath,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ],
+        headless: 'new'
+      };
+    }
   }
 
   throw new Error(`
-Chrome/Chromium Not Found
+Chrome/Chromium not found!
 
-Chrome/Chromium is not installed or not accessible.
+Project root: ${projectRoot}
+Checked paths: ${chromePaths.join(', ')}
 
-Searched locations:
-${systemPaths.map(p => `   - ${p}`).join('\n')}
+Chrome should be installed at: ${projectRoot}/src/chrome/
   `);
 }
 
