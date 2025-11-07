@@ -4,15 +4,13 @@ services:
     env: node
     buildCommand: |
       echo "📦 Installing npm packages..."
-      npm install
+      npm ci
       echo "🌐 Installing Chrome for Puppeteer..."
       npx puppeteer browsers install chrome
+      echo "🔍 Verifying Chrome installation..."
+      node -e "console.log('Puppeteer Chrome path:', require('puppeteer').executablePath())"
       echo "✅ Build complete!"
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "false"
-      - key: PUPPETEER_EXECUTABLE_PATH
-        sync: false
