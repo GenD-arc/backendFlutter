@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const puppeteer = require('puppeteer');
+const { getBrowserConfig } = require('../../controllers/puppeteer.config');
 const { verifyToken } = require("../../middleware/auth");
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
@@ -41,10 +42,10 @@ router.get("/pdf", verifyToken, async (req, res) => {
 
     const htmlContent = generateHTMLTemplate(reportData, charts);
 
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const browserConfig = getBrowserConfig();
+console.log('🚀 Launching browser for PDF generation');
+console.log('   Executable path:', browserConfig.executablePath);
+const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
@@ -478,18 +479,15 @@ async function fetchReportData(month, year) {
 
 */
 
-// Replace the generateCharts function with this version
-// This uses Puppeteer to render Plotly charts directly in the browser
-// No canvas native dependencies required!
 
 async function generateCharts(reportData) {
   const charts = {};
 
   try {
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const browserConfig = getBrowserConfig();
+    console.log('🚀 Launching browser for chart generation');
+    console.log('   Executable path:', browserConfig.executablePath);
+    const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 600 });
@@ -702,6 +700,14 @@ async function generateCharts(reportData) {
 
   } catch (error) {
     console.error('❌ Error generating charts:', error);
+    console.error('   Attempted Chrome path:', getBrowserConfig().executablePath);
+    console.error('   Available paths checked:', [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      process.env.CHROME_BIN,
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+    ].filter(Boolean));
     return {};
   }
 }
