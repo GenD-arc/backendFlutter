@@ -3,13 +3,17 @@ services:
     name: mseuf-reservation-system
     env: node
     buildCommand: |
+      echo "📦 Installing system dependencies..."
       apt-get update
       apt-get install -y chromium fonts-liberation
+      echo "📦 Installing npm packages..."
       npm install
-      npx puppeteer browsers install chrome || true
+      echo "🌐 Installing Chrome for Puppeteer..."
+      npx puppeteer browsers install chrome || echo "Using system Chromium"
+      echo "✅ Build complete!"
     startCommand: npm start
     envVars:
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/chromium
       - key: NODE_ENV
         value: production
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
