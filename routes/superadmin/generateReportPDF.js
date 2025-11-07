@@ -42,7 +42,7 @@ router.get("/pdf", verifyToken, async (req, res) => {
 
     const htmlContent = generateHTMLTemplate(reportData, charts);
 
-    const browserConfig = getBrowserConfig();
+    const browserConfig = await getBrowserConfig();
 console.log('🚀 Launching browser for PDF generation');
 console.log('   Executable path:', browserConfig.executablePath);
 const browser = await puppeteer.launch(browserConfig);
@@ -484,7 +484,7 @@ async function generateCharts(reportData) {
   const charts = {};
 
   try {
-    const browserConfig = getBrowserConfig();
+    const browserConfig = await getBrowserConfig();
     console.log('🚀 Launching browser for chart generation');
     console.log('   Executable path:', browserConfig.executablePath);
     const browser = await puppeteer.launch(browserConfig);
