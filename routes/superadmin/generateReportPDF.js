@@ -487,10 +487,49 @@ async function generateCharts(reportData) {
     const browserConfig = await getBrowserConfig();
     console.log('🚀 Launching browser for chart generation');
     console.log('   Executable path:', browserConfig.executablePath);
+    
     const browser = await puppeteer.launch(browserConfig);
-
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 600 });
+
+    // Helper function to generate chart with better error handling
+    const generateChart = async (htmlContent, chartName) => {
+      try {
+        console.log(`📊 Generating ${chartName}...`);
+        
+        // Use domcontentloaded instead of networkidle0 for faster loading
+        await page.setContent(htmlContent, { 
+          waitUntil: 'domcontentloaded',
+          timeout: 45000 
+        });
+        
+        // Wait for Plotly to be available
+        await page.waitForFunction(
+          () => typeof window.Plotly !== 'undefined',
+          { timeout: 10000 }
+        );
+        
+        // Wait for chart div to exist
+        await page.waitForSelector('#chart', { timeout: 5000 });
+        
+        // Extra wait for Plotly to render
+        await page.waitForFunction(
+          () => document.querySelector('#chart .plotly'),
+          { timeout: 10000 }
+        );
+        
+        // Small buffer for final rendering
+        await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 500)));
+        
+        const screenshot = await page.screenshot({ encoding: 'base64' });
+        console.log(`✅ ${chartName} generated successfully`);
+        return screenshot;
+        
+      } catch (error) {
+        console.error(`❌ Failed to generate ${chartName}:`, error.message);
+        throw error;
+      }
+    };
 
     // Status Pie Chart
     const statusHTML = `
@@ -498,8 +537,12 @@ async function generateCharts(reportData) {
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+        <style>
+          body { margin: 0; padding: 20px; background: white; }
+          #chart { width: 800px; height: 400px; }
+        </style>
       </head>
-      <body style="margin:0;padding:20px;background:white;">
+      <body>
         <div id="chart"></div>
         <script>
           const data = [{
@@ -528,11 +571,7 @@ async function generateCharts(reportData) {
       </html>
     `;
     
-    await page.setContent(statusHTML, { waitUntil: 'networkidle0' });
-    //await page.waitForTimeout(500);
-    await page.waitForSelector('#chart', { timeout: 5000 });
-await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
-    charts.statusPie = await page.screenshot({ encoding: 'base64' });
+    charts.statusPie = await generateChart(statusHTML, 'Status Pie Chart');
 
     // Resource Bar Chart
     const resourcesWithBookings = reportData.resource_utilization.filter(r => r.booking_count > 0);
@@ -545,8 +584,12 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+        <style>
+          body { margin: 0; padding: 20px; background: white; }
+          #chart { width: 800px; height: 600px; }
+        </style>
       </head>
-      <body style="margin:0;padding:20px;background:white;">
+      <body>
         <div id="chart"></div>
         <script>
           const data = [{
@@ -575,11 +618,7 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       </html>
     `;
     
-    await page.setContent(resourceHTML, { waitUntil: 'networkidle0' });
-    //await page.waitForTimeout(500);
-    await page.waitForSelector('#chart', { timeout: 5000 });
-await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
-    charts.resourceBar = await page.screenshot({ encoding: 'base64' });
+    charts.resourceBar = await generateChart(resourceHTML, 'Resource Bar Chart');
 
     // Daily Trends Line Chart
     const trendLabels = reportData.daily_trends.map(d => {
@@ -595,8 +634,12 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+        <style>
+          body { margin: 0; padding: 20px; background: white; }
+          #chart { width: 800px; height: 400px; }
+        </style>
       </head>
-      <body style="margin:0;padding:20px;background:white;">
+      <body>
         <div id="chart"></div>
         <script>
           const data = [
@@ -644,11 +687,7 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       </html>
     `;
     
-    await page.setContent(trendHTML, { waitUntil: 'networkidle0' });
-    //await page.waitForTimeout(500);
-    await page.waitForSelector('#chart', { timeout: 5000 });
-await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
-    charts.trendLine = await page.screenshot({ encoding: 'base64' });
+    charts.trendLine = await generateChart(trendHTML, 'Trend Line Chart');
 
     // Category Doughnut Chart
     const categoryLabels = reportData.category_breakdown.map(c => c.category);
@@ -659,8 +698,12 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+        <style>
+          body { margin: 0; padding: 20px; background: white; }
+          #chart { width: 800px; height: 400px; }
+        </style>
       </head>
-      <body style="margin:0;padding:20px;background:white;">
+      <body>
         <div id="chart"></div>
         <script>
           const data = [{
@@ -690,11 +733,7 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
       </html>
     `;
     
-    await page.setContent(categoryHTML, { waitUntil: 'networkidle0' });
-    //await page.waitForTimeout(500);
-    await page.waitForSelector('#chart', { timeout: 5000 });
-await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
-    charts.categoryDoughnut = await page.screenshot({ encoding: 'base64' });
+    charts.categoryDoughnut = await generateChart(categoryHTML, 'Category Doughnut Chart');
 
     await browser.close();
 
@@ -708,14 +747,7 @@ await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to 
 
   } catch (error) {
     console.error('❌ Error generating charts:', error);
-    console.error('   Attempted Chrome path:', getBrowserConfig().executablePath);
-    console.error('   Available paths checked:', [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      process.env.CHROME_BIN,
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-      '/usr/bin/google-chrome',
-    ].filter(Boolean));
+    console.error('   Error details:', error.stack);
     return {};
   }
 }
