@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mseuf-reservation-system
+    name: backendFlutter
     env: node
     buildCommand: |
       echo "📦 Installing npm packages..."
