@@ -3,14 +3,12 @@ const router = express.Router();
 const connection = require("../../controllers/database");
 const { verifyToken } = require("../../middleware/auth");
 
-// Get full history for a reservation
 router.get("/:reservation_id", verifyToken, async (req, res) => {
   const reservationId = req.params.reservation_id;
   const userId = req.user.user_id;
   const userRole = req.user.role_id;
 
   try {
-    // Check if user has permission to view this reservation's history
     const permissionCheck = await new Promise((resolve, reject) => {
       connection.query(`
         SELECT 
@@ -40,7 +38,6 @@ router.get("/:reservation_id", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Get complete history using the view
     const history = await new Promise((resolve, reject) => {
       connection.query(`
         SELECT * FROM reservation_history_view 
@@ -56,7 +53,6 @@ router.get("/:reservation_id", verifyToken, async (req, res) => {
       return res.status(404).json({ error: "No history found" });
     }
 
-    // Group the data
     const reservationInfo = {
       reservation_id: history[0].reservation_id,
       f_id: history[0].f_id,
@@ -97,12 +93,10 @@ router.get("/:reservation_id", verifyToken, async (req, res) => {
   }
 });
 
-// Get activity summary for admins/super admins
 router.get("/admin/summary", verifyToken, async (req, res) => {
   const userRole = req.user.role_id;
   const { startDate, endDate, status, actionType } = req.query;
 
-  // Only admins and super admins can access this
   if (!['R02', 'R03'].includes(userRole)) {
     return res.status(403).json({ error: "Access denied" });
   }
@@ -146,7 +140,7 @@ router.get("/admin/summary", verifyToken, async (req, res) => {
       params.push(actionType);
     }
 
-    query += ` ORDER BY action_at DESC LIMIT 1000`; // Limit for performance
+    query += ` ORDER BY action_at DESC LIMIT 1000`;
 
     const activities = await new Promise((resolve, reject) => {
       connection.query(query, params, (err, results) => {

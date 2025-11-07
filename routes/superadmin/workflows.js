@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const connection = require("../../controllers/database");
 
-// Utility: promisify queries
 const queryAsync = (query, params) => {
   return new Promise((resolve, reject) => {
     connection.query(query, params, (err, results) => {
@@ -12,11 +11,6 @@ const queryAsync = (query, params) => {
   });
 };
 
-/**
- * POST /api/superadmin/workflows
- * Create or update workflow steps for a facility
- * Body: { f_id, steps: [{ user_id, step_order }, ...] }
- */
 router.post("/", async (req, res) => {
   try {
     const { f_id, steps } = req.body;
@@ -25,16 +19,13 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Facility ID and steps are required" });
     }
 
-    // Check facility exists
     const facility = await queryAsync("SELECT * FROM university_resources WHERE f_id = ?", [f_id]);
     if (facility.length === 0) {
       return res.status(404).json({ error: "Facility not found" });
     }
 
-    // Clear existing workflow for this facility (resetting order)
     await queryAsync("DELETE FROM facility_approval_workflows WHERE f_id = ?", [f_id]);
 
-    // Insert new steps
     for (const step of steps) {
       if (!step.user_id || !step.step_order) continue;
       await queryAsync(
@@ -45,15 +36,10 @@ router.post("/", async (req, res) => {
 
     return res.status(201).json({ message: "Workflow set successfully" });
   } catch (error) {
-    console.error("Error setting workflow:", error);
     return res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
 
-/**
- * GET /api/superadmin/workflows/:f_id
- * View workflow steps for a facility
- */
 router.get("/:f_id", async (req, res) => {
   try {
     const { f_id } = req.params;
@@ -78,10 +64,6 @@ router.get("/:f_id", async (req, res) => {
   }
 });
 
-/**
- * DELETE /api/superadmin/workflows/:f_id
- * Remove workflow for a facility
- */
 router.delete("/:f_id", async (req, res) => {
   try {
     const { f_id } = req.params;

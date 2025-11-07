@@ -67,17 +67,14 @@ router.post("/", async (req, res) => {
       return res.status(404).json({ error: "Reservation not found" });
     }
 
-    // ✅ NEW: Check if reservation date has already passed
     const now = new Date();
     const reservationStart = new Date(reservationDetails.date_from);
-    const reservationEnd = new Date(reservationDetails.date_to);
 
     if (reservationStart < now) {
       await new Promise((resolve, reject) => {
         connection.query("ROLLBACK", (err) => (err ? reject(err) : resolve()));
       });
       
-      // Auto-cancel expired reservation
       await new Promise((resolve, reject) => {
         connection.query(
           "UPDATE reservations SET status = 'cancelled' WHERE id = ?",
@@ -97,8 +94,6 @@ router.post("/", async (req, res) => {
         'System: Start date has already passed'
       );
 
-      console.log(`⏰ Reservation ${reservation_id} auto-cancelled - date expired`);
-
       return res.status(400).json({ 
         error: "Cannot approve expired reservation",
         message: "This reservation's start date has already passed and has been automatically cancelled.",
@@ -107,14 +102,6 @@ router.post("/", async (req, res) => {
         current_date: now.toISOString(),
         auto_cancelled: true
       });
-    }
-
-    // Check if the reservation will end in less than 1 hour (optional warning)
-    const timeUntilEnd = reservationEnd - now;
-    const oneHour = 60 * 60 * 1000;
-    
-    if (timeUntilEnd < oneHour && timeUntilEnd > 0) {
-      console.log(`⚠️ Warning: Reservation ${reservation_id} ends in less than 1 hour`);
     }
 
     const currentStatus = reservationDetails.status;
@@ -131,8 +118,6 @@ router.post("/", async (req, res) => {
         }
       );
     });
-
-    console.log(`🔍 Previous steps for reservation ${reservation_id}:`, previousSteps);
 
     if (previousSteps.length > 0 && previousSteps.some(step => step.status !== "approved")) {
       await new Promise((resolve, reject) => {
@@ -219,7 +204,6 @@ router.post("/", async (req, res) => {
         'approved'
       );
     } else {
-      // Notify the NEXT approver
       const nextStep = step_order + 1;
       
       const nextApprover = await new Promise((resolve, reject) => {
@@ -270,8 +254,7 @@ router.post("/", async (req, res) => {
 
         const notificationServer = req.app.locals.notificationServer;
         if (notificationServer) {
-          const sent = notificationServer.sendToUser(nextApprover.approver_id, notification);
-          console.log(`🔔 Real-time notification ${sent ? 'sent' : 'failed'} to next approver: ${nextApprover.approver_id}`);
+          notificationServer.sendToUser(nextApprover.approver_id, notification);
         }
       }
     }
@@ -288,7 +271,6 @@ router.post("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error:", error);
     await new Promise((resolve, reject) => {
       connection.query("ROLLBACK", (err) => (err ? reject(err) : resolve()));
     });

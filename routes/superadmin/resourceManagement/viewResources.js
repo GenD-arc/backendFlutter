@@ -18,17 +18,11 @@ router.get("/", (req, res) => {
       return res.status(500).json({ error: "Database error" });
     }
 
-    console.log('Query results:', results.map(r => ({
-      f_id: r.f_id,
-      image_size: r.f_image ? r.f_image.length : null
-    }))); // Debug log
-
     const resources = results.map(resource => {
       let imageUrl = null;
       if (resource.f_image && Buffer.isBuffer(resource.f_image)) {
         try {
           imageUrl = `data:image/jpeg;base64,${resource.f_image.toString('base64')}`;
-          console.log(`Encoded image for ${resource.f_id}: ${imageUrl.slice(0, 50)}... (length: ${imageUrl.length})`); // Debug log
         } catch (error) {
           console.error(`Error encoding image for ${resource.f_id}:`, error);
         }

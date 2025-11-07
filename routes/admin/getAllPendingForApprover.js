@@ -1,4 +1,3 @@
-// routes/admin/getAllPendingForApprover.js
 const express = require("express");
 const router = express.Router();
 const connection = require("../../controllers/database");
@@ -6,10 +5,8 @@ const connection = require("../../controllers/database");
 router.get("/:approver_id", async (req, res) => {
   const approverId = req.params.approver_id;
   
-  console.log(`🔍 Fetching ALL pending reservations for approver: ${approverId}`);
 
   try {
-    // This query gets ALL pending reservations for this approver, without workflow filtering
     const allPendingQuery = `
       SELECT 
         ra.id AS approval_id, 
@@ -42,17 +39,14 @@ router.get("/:approver_id", async (req, res) => {
           console.error('❌ Database query error:', err);
           reject(err);
         } else {
-          console.log(`✅ Found ${results.length} ALL pending approvals for approver ${approverId}`);
           resolve(results || []);
         }
       });
     });
 
-    // Fetch daily slots for each reservation
     const approvalsWithSlots = [];
     
     for (const approval of allPending) {
-      // Fetch daily slots for this reservation
       const dailySlots = await new Promise((resolve, reject) => {
         connection.query(
           `SELECT slot_date, start_time, end_time 
@@ -67,7 +61,6 @@ router.get("/:approver_id", async (req, res) => {
         );
       });
       
-      console.log(`   📅 Found ${dailySlots.length} daily slots for reservation ${approval.reservation_id}`);
       
       approvalsWithSlots.push({
         approval_id: approval.approval_id,
@@ -85,8 +78,6 @@ router.get("/:approver_id", async (req, res) => {
         daily_slots: dailySlots
       });
     }
-
-    console.log(`📊 Final result: ${approvalsWithSlots.length} ALL approvals for approver ${approverId}`);
     
     res.json(approvalsWithSlots);
 

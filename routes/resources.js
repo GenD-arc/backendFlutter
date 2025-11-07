@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const connection = require('../controllers/database');
 
-// GET /api/resources/approver/:approverId - Get resources assigned to an approver
 router.get("/approver/:approverId", (req, res) => {
   const { approverId } = req.params;
   

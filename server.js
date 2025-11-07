@@ -8,7 +8,6 @@ const NotificationWebSocketServer = require('./websocket-server');
 const cron = require('node-cron');
 const cleanupExpiredReservations = require('./routes/cleanupExpiredReservations');
 
-// Initialize WebSocket server
 const notificationServer = new NotificationWebSocketServer(server);
 const { verifyToken } = require('./middleware/auth');
 
@@ -37,6 +36,8 @@ const generalResourcesRouter = require('./routes/resources');
 const publicCalendarRouter = require('./routes/calendar');
 const getAllPendingForApproverRouter = require('./routes/admin/getAllPendingForApprover');
 const todayStatusRouter = require('./routes/todayStatus');
+const monthlyReportsRouter = require('./routes/superadmin/monthlyReports');
+const generateReportPDFRouter = require('./routes/superadmin/generateReportPDF');
 
 app.use(express.static('public'));
 app.use(cors());
@@ -62,6 +63,8 @@ app.use('/api/reservations/status', verifyToken, viewReservationStatusRouter);
 app.use('/api/reservations', verifyToken, dailySlotsRouter);
 app.use('/api/resources', verifyToken, generalResourcesRouter);
 app.use('/api/admin/getAllPendingForApprover', verifyToken, getAllPendingForApproverRouter);
+app.use('/api/superadmin/reports', verifyToken, monthlyReportsRouter);
+app.use('/api/superadmin/reports', verifyToken, generateReportPDFRouter);
 
 // Superadmin routes
 app.use('/api/superadmin/addUser', addUserRouter);
@@ -76,22 +79,16 @@ app.use('/api/superadmin/workflows', workflowRouter);
 
 app.locals.notificationServer = notificationServer;
 
-// ⏰ CRON SCHEDULER: Auto-cleanup expired reservations
-// Runs every day at midnight (00:00)
 cron.schedule('0 0 * * *', async () => {
-  console.log('\n⏰ Scheduled cleanup job triggered at midnight');
   await cleanupExpiredReservations();
 }, {
   timezone: "Asia/Manila" // Philippine timezone
 });
 
-// Optional: Run cleanup on server start for immediate cleanup
 (async () => {
-  console.log('🚀 Running initial cleanup check on server start...');
   await cleanupExpiredReservations();
 })();
 
-// Optional: Manual cleanup endpoint (for testing/admin use)
 app.post('/api/admin/manual-cleanup', verifyToken, async (req, res) => {
   try {
     const result = await cleanupExpiredReservations();
@@ -104,7 +101,4 @@ app.post('/api/admin/manual-cleanup', verifyToken, async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`WebSocket server running on ws://localhost:${PORT}`);
-  console.log(`⏰ Cleanup job scheduled: Daily at midnight (Asia/Manila timezone)`);
 });
-
-module.exports = { app, server, notificationServer };

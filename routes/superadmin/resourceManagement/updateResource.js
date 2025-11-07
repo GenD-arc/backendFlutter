@@ -5,7 +5,6 @@ const multer = require('multer');
 const path = require('path');
 const { fileTypeFromBuffer } = require('file-type');
 
-// Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -20,19 +19,16 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Update resource by ID
 router.put("/:id", upload.single('f_image'), async (req, res) => {
   try {
     const resourceId = req.params.id;
     const { f_name, f_description, category } = req.body;
     const f_image = req.file ? req.file.buffer : null;
 
-    // Validate input
     if (!f_name && !f_description && !category && !f_image) {
       return res.status(400).json({ error: "At least one field must be provided for update" });
     }
 
-    // Validate MIME type if image is provided
     if (f_image) {
       const type = await fileTypeFromBuffer(f_image);
       if (!type || !['image/jpeg', 'image/png'].includes(type.mime)) {
@@ -40,7 +36,6 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
       }
     }
 
-    // Promisify database queries
     const queryAsync = (query, params) => {
       return new Promise((resolve, reject) => {
         connection.query(query, params, (err, results) => {
@@ -50,7 +45,6 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
       });
     };
 
-    // Check if resource exists
     const checkQuery = "SELECT * FROM university_resources WHERE f_id = ?";
     const existingResource = await queryAsync(checkQuery, [resourceId]);
 
@@ -58,7 +52,6 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
       return res.status(404).json({ error: "Resource not found" });
     }
 
-    // Check if new name conflicts with existing resources (excluding current one)
     if (f_name) {
       const nameCheckQuery = "SELECT * FROM university_resources WHERE f_name = ? AND f_id != ?";
       const nameConflict = await queryAsync(nameCheckQuery, [f_name, resourceId]);
@@ -68,7 +61,6 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
       }
     }
 
-    // Build dynamic update query
     let updateFields = [];
     let updateValues = [];
 
@@ -97,8 +89,6 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Resource not found or no changes made" });
     }
-
-    console.log(`Updated resource ${resourceId}, image updated: ${f_image ? 'yes' : 'no'}`);
     return res.status(200).json({ message: "Resource updated successfully" });
 
   } catch (error) {
@@ -107,19 +97,16 @@ router.put("/:id", upload.single('f_image'), async (req, res) => {
   }
 });
 
-// Partial update route (PATCH) for updating specific fields
 router.patch("/:id", upload.single('f_image'), async (req, res) => {
   try {
     const resourceId = req.params.id;
     const { f_name, f_description, category } = req.body;
     const f_image = req.file ? req.file.buffer : null;
 
-    // Validate that at least one field is provided
     if (!f_name && !f_description && !category && !f_image) {
       return res.status(400).json({ error: "At least one field must be provided for update" });
     }
 
-    // Validate MIME type if image is provided
     if (f_image) {
       const type = await fileTypeFromBuffer(f_image);
       if (!type || !['image/jpeg', 'image/png'].includes(type.mime)) {
@@ -135,8 +122,7 @@ router.patch("/:id", upload.single('f_image'), async (req, res) => {
         });
       });
     };
-
-    // Check if resource exists
+    
     const checkQuery = "SELECT * FROM university_resources WHERE f_id = ?";
     const existingResource = await queryAsync(checkQuery, [resourceId]);
 
@@ -144,7 +130,6 @@ router.patch("/:id", upload.single('f_image'), async (req, res) => {
       return res.status(404).json({ error: "Resource not found" });
     }
 
-    // Check name uniqueness if updating name
     if (f_name) {
       const nameCheckQuery = "SELECT * FROM university_resources WHERE f_name = ? AND f_id != ?";
       const nameConflict = await queryAsync(nameCheckQuery, [f_name, resourceId]);
@@ -154,7 +139,6 @@ router.patch("/:id", upload.single('f_image'), async (req, res) => {
       }
     }
 
-    // Build update query dynamically
     let updateFields = [];
     let updateValues = [];
 

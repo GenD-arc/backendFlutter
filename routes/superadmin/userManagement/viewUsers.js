@@ -4,7 +4,7 @@ const connection = require('../../../controllers/database');
 
 router.get('/', (req, res) => {
     const roleId = req.query.role_id?.split(",") || [];
-    const status = req.query.status; // "active", "archived", or "all"
+    const status = req.query.status; 
     const placeholders = roleId.map(() => "?").join(",");
 
     let query = `
@@ -30,7 +30,7 @@ router.get('/', (req, res) => {
     query += " AND u.active = 1";
   } else if (status === "archived") {
     query += " AND u.active = 0";
-  } // else "all" → no filter
+  } 
 
     if (roleId.length > 0) {
         query += ` AND u.role_id IN (${placeholders})`;

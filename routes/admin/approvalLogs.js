@@ -2,12 +2,10 @@ const express = require("express");
 const router = express.Router();
 const connection = require("../../controllers/database");
 
-// GET /api/admin/approval-logs/:approverId
 router.get("/:approverId", async (req, res) => {
   try {
     const { approverId } = req.params;
     
-    // Verify that the requesting user is the same as the approverId or has admin permissions
     if (req.user && req.user.id !== approverId && req.user.role_id !== 'R03' && req.user.role_id !== 'R02') {
       return res.status(403).json({ 
         success: false, 
@@ -15,7 +13,6 @@ router.get("/:approverId", async (req, res) => {
       });
     }
 
-    // SQL query to get approval logs with consistent field naming
     const query = `
       SELECT 
         ra.id as approval_id,
@@ -52,7 +49,6 @@ router.get("/:approverId", async (req, res) => {
       });
     });
 
-    // ✅ NEW: Fetch daily slots for each reservation
     const logsWithSlots = await Promise.all(
       logs.map(async (log) => {
         const slotsQuery = `
@@ -76,7 +72,6 @@ router.get("/:approverId", async (req, res) => {
       })
     );
     
-    // Format the response to match the Flutter model expectations
     const formattedLogs = logsWithSlots.map(log => ({
       approval_id: log.approval_id,
       reservation_id: log.reservation_id,
@@ -95,20 +90,17 @@ router.get("/:approverId", async (req, res) => {
       action: log.action,
       action_date: log.action_date,
       comment: log.comment,
-      status: log.action, // Alias for consistency
+      status: log.action,
       reservation_status: log.reservation_status,
-      // Legacy fields for backward compatibility
       approved_at: log.action === 'approved' ? log.action_date : null,
       rejected_at: log.action === 'rejected' ? log.action_date : null,
       reservation_date: log.date_from,
       start_time: log.date_from,
       end_time: log.date_to,
       notes: log.comment,
-      // ✅ NEW: Include daily slots
       daily_slots: log.daily_slots
     }));
 
-    // Get summary statistics
     const totalLogs = formattedLogs.length;
     const approvedCount = formattedLogs.filter(log => log.action === 'approved').length;
     const rejectedCount = formattedLogs.filter(log => log.action === 'rejected').length;
@@ -124,7 +116,6 @@ router.get("/:approverId", async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching approval logs:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error', 
@@ -133,13 +124,11 @@ router.get("/:approverId", async (req, res) => {
   }
 });
 
-// GET /api/admin/approval-stats/:approverId
 router.get("/stats/:approverId", async (req, res) => {
   try {
     const { approverId } = req.params;
     const { period = '30' } = req.query;
     
-    // Verify permissions
     if (req.user && req.user.id !== approverId && req.user.role_id !== 'R03') {
       return res.status(403).json({ 
         success: false, 
@@ -150,7 +139,6 @@ router.get("/stats/:approverId", async (req, res) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(period));
 
-    // Query for approval statistics
     const statsQuery = `
       SELECT 
         DATE(ra.acted_at) as date,
@@ -172,7 +160,6 @@ router.get("/stats/:approverId", async (req, res) => {
       });
     });
 
-    // Get total counts
     const totalQuery = `
       SELECT 
         COUNT(*) as total,
@@ -199,7 +186,6 @@ router.get("/stats/:approverId", async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching approval statistics:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error', 

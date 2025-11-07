@@ -4,17 +4,14 @@ require('dotenv').config();
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
-    console.log('❌ No token provided');
     return res.status(401).json({ error: 'Unauthorized: No token provided' });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key-for-development');
     req.user = { user_id: decoded.user_id, username: decoded.username, role_id: decoded.role_id };
-    console.log('✅ Token verified for user:', decoded.user_id);
     next();
   } catch (error) {
-    console.error('💥 JWT verification failed:', error);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };

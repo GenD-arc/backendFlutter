@@ -3,7 +3,6 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const connection = require('../../../controllers/database');
 
-// Register new user
 router.post("/", async (req, res) => {
   const { id, name, department, username, email, password, role_id } = req.body;
 
@@ -12,7 +11,6 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // Check if email or ID already exists
     const checkQuery = "SELECT * FROM accounts WHERE email = ? OR user_id = ?";
     connection.query(checkQuery, [email, id], async (err, results) => {
       if (err) {
@@ -24,10 +22,8 @@ router.post("/", async (req, res) => {
         return res.status(400).json({ error: "Email or ID already exists" });
       }
 
-      // ✅ Hash password before saving
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Insert into users table
       const userQuery =
         "INSERT INTO users (id, name, department, role_id) VALUES (?, ?, ?, ?)";
       connection.query(userQuery, [id, name, department, role_id], (userErr) => {
@@ -38,12 +34,11 @@ router.post("/", async (req, res) => {
             .json({ error: "Internal server error while inserting user" });
         }
 
-        // Insert into accounts table
         const accQuery =
           "INSERT INTO accounts (username, email, password, user_id) VALUES (?, ?, ?, ?)";
         connection.query(
           accQuery,
-          [username, email, hashedPassword, id], // ✅ use hashed password
+          [username, email, hashedPassword, id],
           (accErr) => {
             if (accErr) {
               console.error("Error inserting into accounts:", accErr);

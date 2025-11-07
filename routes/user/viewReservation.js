@@ -3,11 +3,9 @@ const router = express.Router();
 const connection = require("../../controllers/database");
 const { verifyToken } = require("../../middleware/auth");
 
-// User views their reservations - PROTECTED ROUTE
 router.get("/:requester_id", verifyToken, (req, res) => {
   const requesterId = req.params.requester_id;
 
-  // Optional: Verify that the user is requesting their own reservations
   if (req.user.user_id !== requesterId) {
     return res.status(403).json({ error: "Access denied" });
   }
@@ -26,15 +24,12 @@ router.get("/:requester_id", verifyToken, (req, res) => {
       return res.status(500).json({ error: "Database error" });
     }
 
-    // If no reservations found, return empty array
     if (results.length === 0) {
       return res.json([]);
     }
 
-    // Get reservation IDs for fetching daily slots
     const reservationIds = results.map(r => r.id);
     
-    // Fetch all daily slots for these reservations
     const slotsQuery = `
       SELECT 
         reservation_id,
@@ -52,9 +47,6 @@ router.get("/:requester_id", verifyToken, (req, res) => {
         return res.status(500).json({ error: "Database error fetching slots" });
       }
 
-      console.log(`Found ${slotsResults.length} daily slots for ${results.length} reservations`);
-
-      // Group slots by reservation_id
       const slotsByReservation = {};
       slotsResults.forEach(slot => {
         if (!slotsByReservation[slot.reservation_id]) {
@@ -67,13 +59,11 @@ router.get("/:requester_id", verifyToken, (req, res) => {
         });
       });
 
-      // Add daily_slots to each reservation
       const reservationsWithSlots = results.map(reservation => ({
         ...reservation,
         daily_slots: slotsByReservation[reservation.id] || []
       }));
 
-      console.log(`Returning ${reservationsWithSlots.length} reservations with daily slots`);
       res.json(reservationsWithSlots);
     });
   });

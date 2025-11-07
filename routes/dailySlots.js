@@ -3,11 +3,8 @@ const router = express.Router();
 const connection = require("../controllers/database");
 const { verifyToken } = require("../middleware/auth");
 
-// Get daily slots for a specific reservation
 router.get("/:reservation_id/daily-slots", verifyToken, (req, res) => {
   const reservationId = req.params.reservation_id;
-
-  console.log(`Fetching daily slots for reservation: ${reservationId}`);
 
   const query = `
     SELECT 
@@ -28,11 +25,8 @@ router.get("/:reservation_id/daily-slots", verifyToken, (req, res) => {
     }
 
     if (results.length === 0) {
-      console.log(`No daily slots found for reservation: ${reservationId}`);
       return res.status(404).json({ error: "No daily slots found" });
     }
-
-    console.log(`Found ${results.length} daily slots for reservation ${reservationId}`);
 
     const dailySlots = results.map(row => ({
       id: row.id,

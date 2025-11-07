@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const connection = require('../../../controllers/database');
 
-// Delete user by ID
 router.delete("/:id", (req, res) => {
   const userId = req.params.id;
 
@@ -11,7 +10,6 @@ router.delete("/:id", (req, res) => {
   }
 
   try {
-    // First, check if the user exists
     const checkUserQuery = "SELECT * FROM users WHERE id = ?";
     connection.query(checkUserQuery, [userId], (err, userResults) => {
       if (err) {
@@ -25,14 +23,12 @@ router.delete("/:id", (req, res) => {
 
       const user = userResults[0];
 
-      // Start transaction for deleting from both tables
       connection.beginTransaction((transactionErr) => {
         if (transactionErr) {
           console.error("Error starting transaction:", transactionErr);
           return res.status(500).json({ error: "Database transaction error" });
         }
 
-        // Delete from accounts table first (child table)
         const deleteAccountQuery = "DELETE FROM accounts WHERE user_id = ?";
         connection.query(deleteAccountQuery, [userId], (accountErr) => {
           if (accountErr) {
@@ -42,7 +38,6 @@ router.delete("/:id", (req, res) => {
             });
           }
 
-          // Delete from users table (parent table)
           const deleteUserQuery = "DELETE FROM users WHERE id = ?";
           connection.query(deleteUserQuery, [userId], (userErr) => {
             if (userErr) {
@@ -52,7 +47,6 @@ router.delete("/:id", (req, res) => {
               });
             }
 
-            // Commit transaction
             connection.commit((commitErr) => {
               if (commitErr) {
                 console.error("Error committing transaction:", commitErr);
@@ -80,7 +74,6 @@ router.delete("/:id", (req, res) => {
   }
 });
 
-// Soft delete user (alternative approach - marks as inactive instead of permanent deletion)
 router.patch("/:id/deactivate", (req, res) => {
   const userId = req.params.id;
 
@@ -89,8 +82,6 @@ router.patch("/:id/deactivate", (req, res) => {
   }
 
   try {
-    // Check if users table has an 'active' or 'status' column
-    // If not, you'll need to add one: ALTER TABLE users ADD COLUMN active BOOLEAN DEFAULT TRUE;
     const deactivateQuery = "UPDATE users SET active = FALSE WHERE id = ?";
     
     connection.query(deactivateQuery, [userId], (err, results) => {
@@ -103,7 +94,6 @@ router.patch("/:id/deactivate", (req, res) => {
         return res.status(404).json({ error: "User not found" });
       }
 
-      console.log(`User ${userId} deactivated successfully.`);
       res.status(200).json({ 
         message: "User deactivated successfully", 
         userId: userId 
@@ -115,7 +105,6 @@ router.patch("/:id/deactivate", (req, res) => {
   }
 });
 
-// Restore user (reactivate)
 router.patch("/:id/restore", (req, res) => {
   const userId = req.params.id;
 
@@ -136,7 +125,6 @@ router.patch("/:id/restore", (req, res) => {
         return res.status(404).json({ error: "User not found" });
       }
 
-      console.log(`User ${userId} restored successfully.`);
       res.status(200).json({ 
         message: "User restored successfully", 
         userId: userId 
@@ -149,7 +137,6 @@ router.patch("/:id/restore", (req, res) => {
 });
 
 
-// Bulk delete users
 router.post("/bulk", (req, res) => {
   const { userIds } = req.body;
 
@@ -160,14 +147,12 @@ router.post("/bulk", (req, res) => {
   try {
     const placeholders = userIds.map(() => "?").join(",");
     
-    // Start transaction
     connection.beginTransaction((transactionErr) => {
       if (transactionErr) {
         console.error("Error starting transaction:", transactionErr);
         return res.status(500).json({ error: "Database transaction error" });
       }
 
-      // Delete from accounts table first
       const deleteAccountsQuery = `DELETE FROM accounts WHERE user_id IN (${placeholders})`;
       connection.query(deleteAccountsQuery, userIds, (accountErr, accountResults) => {
         if (accountErr) {
@@ -177,7 +162,6 @@ router.post("/bulk", (req, res) => {
           });
         }
 
-        // Delete from users table
         const deleteUsersQuery = `DELETE FROM users WHERE id IN (${placeholders})`;
         connection.query(deleteUsersQuery, userIds, (userErr, userResults) => {
           if (userErr) {
@@ -187,7 +171,6 @@ router.post("/bulk", (req, res) => {
             });
           }
 
-          // Commit transaction
           connection.commit((commitErr) => {
             if (commitErr) {
               console.error("Error committing transaction:", commitErr);

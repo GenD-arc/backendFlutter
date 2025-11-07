@@ -4,11 +4,8 @@ const connection = require("../../controllers/database");
 
 router.get("/:approver_id", async (req, res) => {
   const approverId = req.params.approver_id;
-  
-  console.log(`🔍 Fetching pending reservations for approver: ${approverId}`);
 
   try {
-    // Updated query to include daily_slots
     const allPendingQuery = `
       SELECT 
         ra.id AS approval_id, 
@@ -40,19 +37,14 @@ router.get("/:approver_id", async (req, res) => {
           console.error('❌ Database query error:', err);
           reject(err);
         } else {
-          console.log(`✅ Found ${results.length} pending approvals (before workflow check)`);
           resolve(results || []);
         }
       });
     });
 
-    // Filter based on workflow step order and fetch daily slots
     const validApprovals = [];
     
     for (const approval of allPending) {
-      console.log(`🔍 Checking approval ${approval.approval_id} (step ${approval.step_order}) for reservation ${approval.reservation_id}`);
-      
-      // Check if there are any previous steps that are not approved
       const previousSteps = await new Promise((resolve, reject) => {
         connection.query(
           "SELECT status FROM reservation_approvals WHERE reservation_id = ? AND step_order < ?",
@@ -64,15 +56,10 @@ router.get("/:approver_id", async (req, res) => {
         );
       });
       
-      console.log(`   Previous steps:`, previousSteps.map(s => s.status));
-      
-      // If no previous steps exist, OR all previous steps are approved, include this approval
       const allPreviousApproved = previousSteps.length === 0 || previousSteps.every(step => step.status === 'approved');
       
       if (allPreviousApproved) {
-        console.log(`   ✅ Including approval ${approval.approval_id}`);
         
-        // ✅ Fetch daily slots for this reservation
         const dailySlots = await new Promise((resolve, reject) => {
           connection.query(
             `SELECT slot_date, start_time, end_time 
@@ -87,7 +74,6 @@ router.get("/:approver_id", async (req, res) => {
           );
         });
         
-        console.log(`   📅 Found ${dailySlots.length} daily slots for reservation ${approval.reservation_id}`);
         
         validApprovals.push({
           approval_id: approval.approval_id,
@@ -102,15 +88,11 @@ router.get("/:approver_id", async (req, res) => {
           requester_id: approval.requester_id,
           requester_name: approval.requester_name,
           step_order: approval.step_order,
-          daily_slots: dailySlots  // ✅ Added daily slots array
+          daily_slots: dailySlots  
         });
       } else {
-        console.log(`   ❌ Skipping approval ${approval.approval_id} - previous steps not approved`);
       }
     }
-
-    console.log(`📊 Final result: ${validApprovals.length} valid approvals`);
-    console.log(`📋 Sample data:`, JSON.stringify(validApprovals[0], null, 2));
     
     res.json(validApprovals);
 

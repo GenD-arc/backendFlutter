@@ -3,7 +3,6 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const connection = require('../../../controllers/database');
 
-// Update user by ID
 router.put("/:id", async (req, res) => {
   const userId = req.params.id;
   const { name, department, username, email, password, role_id } = req.body;
@@ -13,7 +12,6 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
-    // First, check if the user exists
     const checkUserQuery = "SELECT * FROM users WHERE id = ?";
     connection.query(checkUserQuery, [userId], async (err, userResults) => {
       if (err) {
@@ -25,7 +23,6 @@ router.put("/:id", async (req, res) => {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Check if email or username already exists for other users (not the current user)
       const checkDuplicateQuery = `
         SELECT a.user_id, a.email, a.username 
         FROM accounts a 
@@ -48,7 +45,6 @@ router.put("/:id", async (req, res) => {
           }
         }
 
-        // Start transaction for updating both tables
         connection.beginTransaction(async (transactionErr) => {
           if (transactionErr) {
             console.error("Error starting transaction:", transactionErr);
@@ -56,7 +52,6 @@ router.put("/:id", async (req, res) => {
           }
 
           try {
-            // Update users table
             const updateUserQuery = `
               UPDATE users 
               SET name = ?, department = ?, role_id = ? 
@@ -71,12 +66,10 @@ router.put("/:id", async (req, res) => {
                 });
               }
 
-              // Prepare account update query and parameters
               let updateAccountQuery;
               let accountParams;
 
               if (password && password.trim() !== '') {
-                // If password is provided, hash it and update
                 bcrypt.hash(password, 10, (hashErr, hashedPassword) => {
                   if (hashErr) {
                     console.error("Error hashing password:", hashErr);
@@ -92,7 +85,6 @@ router.put("/:id", async (req, res) => {
                   `;
                   accountParams = [username, email, hashedPassword, userId];
 
-                  // Execute account update with password
                   connection.query(updateAccountQuery, accountParams, (accountUpdateErr) => {
                     if (accountUpdateErr) {
                       console.error("Error updating accounts table:", accountUpdateErr);
@@ -101,7 +93,6 @@ router.put("/:id", async (req, res) => {
                       });
                     }
 
-                    // Commit transaction
                     connection.commit((commitErr) => {
                       if (commitErr) {
                         console.error("Error committing transaction:", commitErr);
@@ -119,7 +110,6 @@ router.put("/:id", async (req, res) => {
                   });
                 });
               } else {
-                // If no password provided, update without password
                 updateAccountQuery = `
                   UPDATE accounts 
                   SET username = ?, email = ? 
@@ -135,7 +125,6 @@ router.put("/:id", async (req, res) => {
                     });
                   }
 
-                  // Commit transaction
                   connection.commit((commitErr) => {
                     if (commitErr) {
                       console.error("Error committing transaction:", commitErr);
@@ -168,7 +157,6 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Get user details by ID (for edit form population)
 router.get("/:id", (req, res) => {
   const userId = req.params.id;
 
@@ -198,7 +186,6 @@ router.get("/:id", (req, res) => {
     }
 
     const user = results[0];
-    // Don't send password in response for security
     res.status(200).json({
       id: user.id,
       name: user.name,

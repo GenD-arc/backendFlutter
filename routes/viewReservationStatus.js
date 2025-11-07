@@ -8,8 +8,6 @@ const { verifyToken } = require("../middleware/auth");
 router.get("/:reservation_id", verifyToken, (req, res) => {
   const reservationId = req.params.reservation_id;
 
-  console.log(`Fetching status for reservation: ${reservationId}`); // Debug log
-
   const query = `
     SELECT 
       r.id AS reservation_id,
@@ -41,11 +39,8 @@ router.get("/:reservation_id", verifyToken, (req, res) => {
     }
 
     if (results.length === 0) {
-      console.log(`No reservation found with ID: ${reservationId}`); // Debug log
       return res.status(404).json({ error: "Reservation not found" });
     }
-
-    console.log(`Found ${results.length} approval steps for reservation ${reservationId}`); // Debug log
 
     // Check if we have any approval data
     const hasApprovalData = results.some(row => row.step_order !== null);
@@ -66,8 +61,6 @@ router.get("/:reservation_id", verifyToken, (req, res) => {
         console.error("DB error fetching slots:", slotsErr);
         return res.status(500).json({ error: "Database error fetching slots" });
       }
-
-      console.log(`Found ${slotsResults.length} daily slots for reservation ${reservationId}`); // Debug log
 
       const response = {
         id: results[0].reservation_id,
@@ -92,7 +85,6 @@ router.get("/:reservation_id", verifyToken, (req, res) => {
         })).filter(approval => approval.step_order !== null) : []
       };
 
-      console.log("Response data:", JSON.stringify(response, null, 2)); // Debug log
       res.json(response);
     });
   });

@@ -17,29 +17,21 @@ const logActivity = async (reservationId, userId, actionType, description, oldSt
   });
 };
 
-// Simple function to get current date in YYYY-MM-DD format in Philippine time
 function getCurrentPhDateString() {
   const now = new Date();
-  // Convert to Philippine time (UTC+8)
   const phTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
-  return phTime.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  return phTime.toISOString().split('T')[0]; 
 }
 
-// Simple function to compare date strings (YYYY-MM-DD)
 function isDateInPast(selectedDateString) {
   const currentDateString = getCurrentPhDateString();
-  console.log('🔍 Simple Date Comparison:');
-  console.log('📅 Current Date (PH):', currentDateString);
-  console.log('📅 Selected Date:', selectedDateString);
-  console.log('📅 Is in past?', selectedDateString < currentDateString);
   
   return selectedDateString < currentDateString;
 }
 
-// Check if time is in the future for today's reservations
 function isTimeInFuture(timeString) {
   const now = new Date();
-  const phTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); // Current PH time
+  const phTime = new Date(now.getTime() + (8 * 60 * 60 * 1000)); 
   
   const [hours, minutes] = timeString.split(':');
   const slotTime = new Date(phTime);
@@ -63,10 +55,9 @@ router.post("/", async (req, res) => {
 
   try {
     const sortedSlots = daily_slots.sort((a, b) => new Date(a.date) - new Date(b.date));
-    const startDateString = sortedSlots[0].date; // This is already YYYY-MM-DD
+    const startDateString = sortedSlots[0].date; 
     const endDateString = sortedSlots[sortedSlots.length - 1].date;
 
-    // Convert to Date objects for comparison (these will be in local time, but we only care about the date part)
     const startDate = new Date(startDateString);
     const endDate = new Date(endDateString);
 
@@ -74,7 +65,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "End date must be after start date" });
     }
 
-    // SIMPLE FIX: Compare date strings directly
     if (isDateInPast(startDateString)) {
       return res.status(400).json({ 
         error: "Start date cannot be in the past",
@@ -83,18 +73,12 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Additional validation for today's reservations
     const currentDateString = getCurrentPhDateString();
     if (startDateString === currentDateString) {
-      console.log('📅 Today reservation detected, validating time slots...');
       
-      // Check if end time is in the future for today's slots
       const todaySlots = sortedSlots.filter(slot => slot.date === currentDateString);
-      console.log(`📅 Found ${todaySlots.length} slot(s) for today`);
 
       for (const slot of todaySlots) {
-        console.log('⏰ Time Validation for slot:', slot.end_time);
-        console.log('⏰ Is end time in future?', isTimeInFuture(slot.end_time));
         
         if (!isTimeInFuture(slot.end_time)) {
           return res.status(400).json({ 
@@ -110,7 +94,7 @@ router.post("/", async (req, res) => {
     const conflicts = [];
     
     for (const slot of sortedSlots) {
-      const slotDate = slot.date; // Use the date string directly
+      const slotDate = slot.date;
       
       const conflictQuery = `
         SELECT 
@@ -236,7 +220,6 @@ router.post("/", async (req, res) => {
       );
     });
 
-    // Insert approval steps
     for (const step of workflow) {
       await new Promise((resolve, reject) => {
         connection.query(
@@ -247,8 +230,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // 🔔 REAL-TIME NOTIFICATION: Only notify the FIRST approver
-    const firstApprover = workflow[0]; // Step 1 approver
+    const firstApprover = workflow[0]; 
     
     const notification = {
       type: 'NEW_RESERVATION',
@@ -262,11 +244,9 @@ router.post("/", async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Get the notification server from app locals
     const notificationServer = req.app.locals.notificationServer;
     if (notificationServer) {
       const sent = notificationServer.sendToUser(firstApprover.user_id, notification);
-      console.log(`🔔 Real-time notification ${sent ? 'sent' : 'failed'} to first approver: ${firstApprover.user_id}`);
     }
 
     const metadata = JSON.stringify({
@@ -325,7 +305,7 @@ router.post("/check-availability", async (req, res) => {
         continue;
       }
 
-      const slotDate = slot.date; // Use the date string directly
+      const slotDate = slot.date; 
 
       const conflictQuery = `
         SELECT 
