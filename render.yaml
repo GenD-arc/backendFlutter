@@ -13,4 +13,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: false
+        value: "false"
+      - key: PUPPETEER_EXECUTABLE_PATH
+        sync: false
