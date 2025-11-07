@@ -529,7 +529,9 @@ async function generateCharts(reportData) {
     `;
     
     await page.setContent(statusHTML, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(500);
+    //await page.waitForTimeout(500);
+    await page.waitForSelector('#chart', { timeout: 5000 });
+await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
     charts.statusPie = await page.screenshot({ encoding: 'base64' });
 
     // Resource Bar Chart
@@ -574,7 +576,9 @@ async function generateCharts(reportData) {
     `;
     
     await page.setContent(resourceHTML, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(500);
+    //await page.waitForTimeout(500);
+    await page.waitForSelector('#chart', { timeout: 5000 });
+await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
     charts.resourceBar = await page.screenshot({ encoding: 'base64' });
 
     // Daily Trends Line Chart
@@ -641,7 +645,9 @@ async function generateCharts(reportData) {
     `;
     
     await page.setContent(trendHTML, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(500);
+    //await page.waitForTimeout(500);
+    await page.waitForSelector('#chart', { timeout: 5000 });
+await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
     charts.trendLine = await page.screenshot({ encoding: 'base64' });
 
     // Category Doughnut Chart
@@ -685,7 +691,9 @@ async function generateCharts(reportData) {
     `;
     
     await page.setContent(categoryHTML, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(500);
+    //await page.waitForTimeout(500);
+    await page.waitForSelector('#chart', { timeout: 5000 });
+await new Promise(resolve => setTimeout(resolve, 1000)); // Give Plotly time to render
     charts.categoryDoughnut = await page.screenshot({ encoding: 'base64' });
 
     await browser.close();
