@@ -4,12 +4,18 @@ const connection = require("../controllers/database");
 
 // Helper to get Philippine time date object
 const getPhilippineDate = () => {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  const now = new Date();
+  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
 };
 
-// Helper to get YYYY-MM-DD string in Philippine timezone
+// Helper to get YYYY-MM-DD string in Philippine timezone (more reliable)
 const getPhilippineDateString = (date = new Date()) => {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
+  // More reliable method for Philippine timezone
+  const phDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  const year = phDate.getFullYear();
+  const month = String(phDate.getMonth() + 1).padStart(2, '0');
+  const day = String(phDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 // CRITICAL: Compare dates properly in Philippine timezone
@@ -22,6 +28,14 @@ router.get("/", async (req, res) => {
   try {
     const today = getPhilippineDate();
     const todayDateString = getPhilippineDateString(today);
+
+    // Debug: Check what the actual current time is
+    const actualNow = new Date();
+    console.log("🔍 DEBUG DATE INFO:");
+    console.log("   Actual server time:", actualNow.toISOString());
+    console.log("   Philippine time object:", today.toString());
+    console.log("   Philippine date string:", todayDateString);
+    console.log("   Philippine time formatted:", today.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
 
     console.log("🇵🇭 Current Philippine Time:", today.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
     console.log("📅 Today's Date (Philippine):", todayDateString);
