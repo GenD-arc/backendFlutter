@@ -1,16 +1,17 @@
 services:
   - type: web
-    name: backendFlutter
+    name: mseuf-reservation-backend
     env: node
-    buildCommand: |
-      echo "📦 Installing npm packages..."
-      npm ci
-      echo "🌐 Installing Chrome for Puppeteer..."
-      npx puppeteer browsers install chrome
-      echo "🔍 Verifying Chrome installation..."
-      node -e "console.log('Puppeteer Chrome path:', require('puppeteer').executablePath())"
-      echo "✅ Build complete!"
+    region: singapore
+    plan: starter
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: false
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/.cache/puppeteer
+    # Ensure Puppeteer Chrome is cached
+    autoDeploy: true
