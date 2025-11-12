@@ -318,16 +318,16 @@ async function fetchReportData(month, year) {
 }
 
 function generateHTMLTemplate(data, charts) {
+  
   const generatedDateTime = new Date(data.generated_at);
-generatedDateTime.setHours(generatedDateTime.getHours() + 8); // Convert UTC to Philippine Time
-const generatedDate = generatedDateTime.toLocaleDateString('en-US', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'Asia/Manila'
-});
+  const generatedDate = generatedDateTime.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Manila'
+  });
 
   const insights = generateInsights(data);
   
