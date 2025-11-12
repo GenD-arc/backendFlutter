@@ -37,7 +37,7 @@ router.get("/", async (req, res) => {
       );
     });
 
-    // Get reservations with slots for today ONLY
+    // Get reservations with slots for today ONLY (using Philippine timezone conversion)
     const todayReservationsQuery = `
       SELECT 
         r.id as reservation_id,
@@ -84,7 +84,7 @@ router.get("/", async (req, res) => {
         AND r.purpose != ''
         AND r.date_from IS NOT NULL
         AND r.date_to IS NOT NULL
-        AND DATE(rds.slot_date) = ?
+        AND DATE(CONVERT_TZ(rds.slot_date, '+00:00', '+08:00')) = ?
       ORDER BY r.status = 'approved' DESC, rds.start_time ASC
     `;
 
