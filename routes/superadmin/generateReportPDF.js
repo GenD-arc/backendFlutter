@@ -61,30 +61,32 @@ router.get("/pdf", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ PDF generation with puppeteer-core (Updated for Render.com)
+
+// ✅ PDF generation with puppeteer-core (Updated for Render.com with @sparticuz/chromium)
 async function generatePDFWithPuppeteer(htmlContent) {
   let browser;
   try {
     const puppeteer = require('puppeteer-core');
+    const chromium = require('@sparticuz/chromium');
 
-    // ✅ Render.com specific configuration
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
+    // ✅ Get Chromium executable path from @sparticuz/chromium
+    const executablePath = await chromium.executablePath();
 
     console.log(`✅ Using Chrome at: ${executablePath}`);
 
     const browserConfig = {
       executablePath,
-      headless: true, // Changed from 'new' to true for better compatibility
+      headless: chromium.headless,
       args: [
+        ...chromium.args,
         '--no-sandbox',
         '--disable-setuid-sandbox', 
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-extensions',
-        '--single-process', // Important for Render.com
-        '--no-zygote' // Important for Render.com
+        '--single-process',
+        '--no-zygote'
       ],
+      defaultViewport: chromium.defaultViewport,
       timeout: 30000
     };
 

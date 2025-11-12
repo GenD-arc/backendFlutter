@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@sparticuz/chromium": "^141.0.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "canvas": "^3.2.0",

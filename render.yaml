@@ -4,5 +4,6 @@ services:
     env: node
     buildCommand: |
       npm install
-      apt-get update && apt-get install -y chromium
+      apt-get update
+      apt-get install -y chromium chromium-sandbox
     startCommand: npm start
