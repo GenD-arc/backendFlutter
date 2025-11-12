@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const puppeteer = require('puppeteer');
 const { getBrowserConfig } = require('../../controllers/puppeteer.config');
 const { verifyToken } = require("../../middleware/auth");
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
@@ -39,13 +38,13 @@ router.get("/pdf", verifyToken, async (req, res) => {
     }
 
     const charts = await generateCharts(reportData);
-
     const htmlContent = generateHTMLTemplate(reportData, charts);
 
     const browserConfig = getBrowserConfig();
 console.log('🚀 Launching browser for PDF generation');
 console.log('   Executable path:', browserConfig.executablePath);
-const browser = await puppeteer.launch(browserConfig);
+const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
@@ -279,207 +278,6 @@ async function fetchReportData(month, year) {
   }
 }
 
-/*async function generateCharts(reportData) {
-  const width = 800;
-  const height = 400;
-  const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
-
-  const charts = {};
-
-  try {
-    const statusLabels = ['Approved', 'Rejected', 'Pending', 'Cancelled'];
-    const statusData = [
-      reportData.summary.approved,
-      reportData.summary.rejected,
-      reportData.summary.pending,
-      reportData.summary.cancelled
-    ];
-
-    const statusConfig = {
-      type: 'pie',
-      data: {
-        labels: statusLabels,
-        datasets: [{
-          data: statusData,
-          backgroundColor: ['#2E7D32', '#C62828', '#F57C00', '#616161'],
-          borderWidth: 2,
-          borderColor: '#fff'
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'right',
-            labels: { font: { size: 14 }, padding: 15 }
-          },
-          title: {
-            display: true,
-            text: 'Reservation Status Distribution',
-            font: { size: 18, weight: 'bold' },
-            padding: { top: 10, bottom: 30 }
-          }
-        }
-      }
-    };
-
-    charts.statusPie = await chartJSNodeCanvas.renderToDataURL(statusConfig);
-
-    const resourcesWithBookings = reportData.resource_utilization.filter(r => r.booking_count > 0);
-    const topResources = resourcesWithBookings.slice(0, 15);
-    const resourceLabels = topResources.map(r => r.resource_name);
-    const resourceBookings = topResources.map(r => r.booking_count);
-
-    const resourceConfig = {
-      type: 'bar',
-      data: {
-        labels: resourceLabels,
-        datasets: [{
-          label: 'Number of Bookings',
-          data: resourceBookings,
-          backgroundColor: '#8B0000',
-          borderColor: '#6B0000',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: {
-            display: true,
-            text: `Most Booked Resources (${resourcesWithBookings.length} booked / ${reportData.resource_utilization.length} total)`,
-            font: { size: 18, weight: 'bold' },
-            padding: { top: 10, bottom: 30 }
-          }
-        },
-        scales: {
-          x: {
-            beginAtZero: true,
-            ticks: { font: { size: 12 } }
-          },
-          y: {
-            ticks: { font: { size: 10 } }
-          }
-        }
-      }
-    };
-
-    charts.resourceBar = await chartJSNodeCanvas.renderToDataURL(resourceConfig);
-
-    const trendLabels = reportData.daily_trends.map(d => {
-      const date = new Date(d.date);
-      return `${date.getMonth() + 1}/${date.getDate()}`;
-    });
-    const trendTotals = reportData.daily_trends.map(d => d.total);
-    const trendApproved = reportData.daily_trends.map(d => d.approved);
-    const trendRejected = reportData.daily_trends.map(d => d.rejected);
-
-    const trendConfig = {
-      type: 'line',
-      data: {
-        labels: trendLabels,
-        datasets: [
-          {
-            label: 'Total Reservations',
-            data: trendTotals,
-            borderColor: '#1976D2',
-            backgroundColor: 'rgba(25, 118, 210, 0.1)',
-            tension: 0.4,
-            fill: true
-          },
-          {
-            label: 'Approved',
-            data: trendApproved,
-            borderColor: '#2E7D32',
-            backgroundColor: 'rgba(46, 125, 50, 0.1)',
-            tension: 0.4,
-            fill: true
-          },
-          {
-            label: 'Rejected',
-            data: trendRejected,
-            borderColor: '#C62828',
-            backgroundColor: 'rgba(198, 40, 40, 0.1)',
-            tension: 0.4,
-            fill: true
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: { font: { size: 12 }, padding: 15 }
-          },
-          title: {
-            display: true,
-            text: 'Daily Reservation Trends',
-            font: { size: 18, weight: 'bold' },
-            padding: { top: 10, bottom: 30 }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { font: { size: 12 } }
-          },
-          x: {
-            ticks: { font: { size: 11 } }
-          }
-        }
-      }
-    };
-
-    charts.trendLine = await chartJSNodeCanvas.renderToDataURL(trendConfig);
-
-    const categoryLabels = reportData.category_breakdown.map(c => c.category);
-    const categoryData = reportData.category_breakdown.map(c => c.booking_count);
-
-    const categoryConfig = {
-      type: 'doughnut',
-      data: {
-        labels: categoryLabels,
-        datasets: [{
-          data: categoryData,
-          backgroundColor: ['#8B0000', '#0F766E', '#EA580C', '#2563EB', '#7C3AED', '#DB2777'],
-          borderWidth: 2,
-          borderColor: '#fff'
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'right',
-            labels: { font: { size: 14 }, padding: 15 }
-          },
-          title: {
-            display: true,
-            text: 'Bookings by Resource Category',
-            font: { size: 18, weight: 'bold' },
-            padding: { top: 10, bottom: 30 }
-          }
-        }
-      }
-    };
-
-    charts.categoryDoughnut = await chartJSNodeCanvas.renderToDataURL(categoryConfig);
-
-    console.log('✅ All charts generated successfully');
-    return charts;
-
-  } catch (error) {
-    console.error('❌ Error generating charts:', error);
-    return {};
-  }
-}
-
-*/
-
-
 async function generateCharts(reportData) {
   const charts = {};
 
@@ -487,6 +285,7 @@ async function generateCharts(reportData) {
     const browserConfig = getBrowserConfig();
     console.log('🚀 Launching browser for chart generation');
     console.log('   Executable path:', browserConfig.executablePath);
+    const puppeteer = require('puppeteer');
     const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
