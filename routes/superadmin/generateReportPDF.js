@@ -308,7 +308,7 @@ async function fetchReportData(month, year) {
       top_requesters: topRequesters,
       department_breakdown: departmentBreakdown,
       admin_performance: adminPerformance,
-      generated_at: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString(),
+      generated_at: new Date().toISOString(),
     };
 
   } catch (error) {
@@ -319,8 +319,8 @@ async function fetchReportData(month, year) {
 
 function generateHTMLTemplate(data, charts) {
   
-  const generatedDateTime = new Date(data.generated_at);
-  const generatedDate = generatedDateTime.toLocaleDateString('en-US', {
+  // Convert UTC timestamp to Philippine Time for display
+  const generatedDate = new Date(data.generated_at).toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
