@@ -5,39 +5,59 @@ const connection = require("../controllers/database");
 // Helper to get Philippine time date object
 const getPhilippineDate = () => {
   const now = new Date();
-  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  // Manila is UTC+8
+  const manilaOffset = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+  return new Date(now.getTime() + manilaOffset);
 };
 
-// Helper to get YYYY-MM-DD string in Philippine timezone (more reliable)
+// Helper to get YYYY-MM-DD string in Philippine timezone
 const getPhilippineDateString = (date = new Date()) => {
-  // More reliable method for Philippine timezone
-  const phDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  const year = phDate.getFullYear();
-  const month = String(phDate.getMonth() + 1).padStart(2, '0');
-  const day = String(phDate.getDate()).padStart(2, '0');
+  // Use the Philippine time calculation
+  const phDate = getPhilippineDate();
+  const year = phDate.getUTCFullYear();
+  const month = String(phDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(phDate.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// Alternative method using manual UTC calculation
+const getPhilippineDateStringManual = () => {
+  const now = new Date();
+  // Get current UTC time and add 8 hours for Manila time
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const manilaTime = new Date(utc + (8 * 3600000)); // UTC+8
+  return manilaTime.toISOString().split('T')[0];
 };
 
 // CRITICAL: Compare dates properly in Philippine timezone
 const isSameDatePhilippine = (dateString1, dateString2) => {
-  // Both should already be in YYYY-MM-DD format
   return dateString1 === dateString2;
+};
+
+// Helper to convert any date to Philippine date string
+const convertToPhilippineDateString = (date) => {
+  if (!date) return null;
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const manilaTime = new Date(utc + (8 * 3600000)); // UTC+8
+  return manilaTime.toISOString().split('T')[0];
 };
 
 router.get("/", async (req, res) => {
   try {
+    // Use the manual calculation method for reliability
+    const todayDateString = getPhilippineDateStringManual();
     const today = getPhilippineDate();
-    const todayDateString = getPhilippineDateString(today);
 
     // Debug: Check what the actual current time is
     const actualNow = new Date();
     console.log("🔍 DEBUG DATE INFO:");
     console.log("   Actual server time:", actualNow.toISOString());
-    console.log("   Philippine time object:", today.toString());
+    console.log("   Server time local:", actualNow.toString());
+    console.log("   Philippine time calculated:", today.toString());
     console.log("   Philippine date string:", todayDateString);
-    console.log("   Philippine time formatted:", today.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+    console.log("   Current hour in Philippines:", today.getUTCHours());
 
-    console.log("🇵🇭 Current Philippine Time:", today.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+    console.log("🇵🇭 Current Philippine Time:", todayDateString);
     console.log("📅 Today's Date (Philippine):", todayDateString);
 
     // Get all resources
@@ -133,9 +153,9 @@ router.get("/", async (req, res) => {
         resourceReservations[resourceId] = [];
       }
       
-      // Convert slot_date to Philippine timezone string
+      // Convert slot_date to Philippine timezone string using manual calculation
       const slotDateString = reservation.slot_date 
-        ? getPhilippineDateString(new Date(reservation.slot_date))
+        ? convertToPhilippineDateString(new Date(reservation.slot_date))
         : null;
       
       console.log(`  🔍 Reservation ${reservation.reservation_id}: slot_date=${reservation.slot_date}, converted=${slotDateString}, today=${todayDateString}, match=${slotDateString === todayDateString}`);
@@ -155,7 +175,7 @@ router.get("/", async (req, res) => {
 
       const isFullyApproved = reservation.approved_steps === reservation.total_steps_required;
       const finalApprovalDate = reservation.final_approval_time
-        ? getPhilippineDateString(new Date(reservation.final_approval_time))
+        ? convertToPhilippineDateString(new Date(reservation.final_approval_time))
         : null;
       const isApprovedToday = isSameDatePhilippine(finalApprovalDate, todayDateString);
 
@@ -168,7 +188,7 @@ router.get("/", async (req, res) => {
           const todaySlots = todayReservations
             .filter(r => {
               const rSlotDateString = r.slot_date 
-                ? getPhilippineDateString(new Date(r.slot_date))
+                ? convertToPhilippineDateString(new Date(r.slot_date))
                 : null;
               return r.reservation_id === reservation.reservation_id && 
                      rSlotDateString === todayDateString &&
@@ -198,7 +218,7 @@ router.get("/", async (req, res) => {
           });
 
           const uniqueDates = allSlotsForReservation
-            .map(slot => slot.slot_date ? getPhilippineDateString(new Date(slot.slot_date)) : null)
+            .map(slot => slot.slot_date ? convertToPhilippineDateString(new Date(slot.slot_date)) : null)
             .filter(Boolean)
             .sort();
 
@@ -309,13 +329,13 @@ router.get("/", async (req, res) => {
         total_reservations_today: todayReservations.length
       },
       debug_info: {
-        current_philippine_time: today.toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+        current_philippine_time: todayDateString,
         today_date_string: todayDateString,
         resources_found: resources.length,
         reservations_queried: todayReservations.length,
         reservations_for_today: dailyNews.length,
         timezone_used: "Asia/Manila (UTC+8)",
-        note: "Only showing reservations with slots dated for TODAY in Philippine timezone"
+        note: "Using manual UTC+8 calculation for Philippine time"
       }
     };
 
