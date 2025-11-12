@@ -4,18 +4,25 @@ const path = require('path');
 const getBrowserConfig = () => {
   const isProduction = process.env.NODE_ENV === 'production';
   
-  // Try to get bundled Chrome from full Puppeteer first
   let executablePath = null;
   
+  // PRIORITY 1: Check for Puppeteer's bundled Chrome
   try {
     const puppeteer = require('puppeteer');
     
     if (puppeteer && typeof puppeteer.executablePath === 'function') {
-      executablePath = puppeteer.executablePath();
-      console.log(`✅ Using Puppeteer bundled Chrome at: ${executablePath}`);
+      const bundledPath = puppeteer.executablePath();
+      
+      // Verify the bundled Chrome actually exists
+      if (bundledPath && fs.existsSync(bundledPath)) {
+        executablePath = bundledPath;
+        console.log(`✅ Using Puppeteer bundled Chrome at: ${executablePath}`);
+      } else {
+        console.log(`⚠️  Puppeteer path found but file doesn't exist: ${bundledPath}`);
+      }
     }
   } catch (err) {
-    console.log('⚠️  Full Puppeteer package not found, trying system Chrome...');
+    console.log('⚠️  Error loading Puppeteer:', err.message);
     
     // Fallback to system Chrome paths
     const chromiumPaths = [
