@@ -4,7 +4,6 @@ const path = require('path');
 const getBrowserConfig = () => {
   const isProduction = process.env.NODE_ENV === 'production';
   
-<<<<<<< HEAD
   // Possible Chrome/Chromium paths (in priority order)
   const chromiumPaths = [
 
@@ -20,8 +19,6 @@ const getBrowserConfig = () => {
   console.log('🔍 Looking for Chrome/Chromium in:', chromiumPaths);
 
   // Find first EXECUTABLE path (not just existing file)
-=======
->>>>>>> 65017680a4af1073698b4b211b4f8f076be2804f
   let executablePath = null;
   
   // PRIORITY 1: Check for Puppeteer's bundled Chrome
