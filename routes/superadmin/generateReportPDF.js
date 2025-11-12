@@ -3,6 +3,7 @@ const router = express.Router();
 const puppeteer = require('puppeteer');
 const { getBrowserConfig } = require('../../controllers/puppeteer.config');
 const { verifyToken } = require("../../middleware/auth");
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
 router.get("/pdf", verifyToken, async (req, res) => {
   try {
@@ -37,48 +38,18 @@ router.get("/pdf", verifyToken, async (req, res) => {
       });
     }
 
-    console.log('📊 Starting chart generation...');
     const charts = await generateCharts(reportData);
-    console.log('✅ Charts generated, keys:', Object.keys(charts));
-
-    // Validate that all charts were generated successfully
-    const requiredCharts = ['statusPie', 'resourceBar', 'trendLine', 'categoryDoughnut'];
-    const missingCharts = requiredCharts.filter(chart => !charts[chart]);
-    
-    if (missingCharts.length > 0) {
-      console.warn('⚠️ Missing charts:', missingCharts);
-    }
 
     const htmlContent = generateHTMLTemplate(reportData, charts);
 
-    const browserConfig = await getBrowserConfig();
-    console.log('🚀 Launching browser for PDF generation');
-    console.log('   Executable path:', browserConfig.executablePath);
-    const browser = await puppeteer.launch(browserConfig);
+    const browserConfig = getBrowserConfig();
+console.log('🚀 Launching browser for PDF generation');
+console.log('   Executable path:', browserConfig.executablePath);
+const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
-    
-    // Set content and wait for images to load
-    await page.setContent(htmlContent, { 
-      waitUntil: 'networkidle0',
-      timeout: 60000 
-    });
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-    // Wait for all images to be loaded
-    await page.evaluate(() => {
-      return Promise.all(
-        Array.from(document.images)
-          .filter(img => !img.complete)
-          .map(img => new Promise((resolve) => {
-            img.onload = img.onerror = resolve;
-          }))
-      );
-    });
-
-    // Additional wait to ensure rendering is complete
-    await page.waitForTimeout(2000);
-
-    console.log('📄 Generating PDF...');
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
@@ -87,8 +58,7 @@ router.get("/pdf", verifyToken, async (req, res) => {
         right: '15mm',
         bottom: '20mm',
         left: '15mm'
-      },
-      preferCSSPageSize: false,
+      }
     });
 
     await browser.close();
@@ -100,12 +70,10 @@ router.get("/pdf", verifyToken, async (req, res) => {
     res.setHeader('Content-Length', pdfBuffer.length);
 
     console.log(`✅ PDF generated successfully: ${filename}`);
-    console.log(`   Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
     res.send(pdfBuffer);
 
   } catch (error) {
     console.error('❌ Error generating PDF report:', error);
-    console.error('   Stack trace:', error.stack);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error', 
@@ -311,67 +279,218 @@ async function fetchReportData(month, year) {
   }
 }
 
+/*async function generateCharts(reportData) {
+  const width = 800;
+  const height = 400;
+  const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: 'white' });
+
+  const charts = {};
+
+  try {
+    const statusLabels = ['Approved', 'Rejected', 'Pending', 'Cancelled'];
+    const statusData = [
+      reportData.summary.approved,
+      reportData.summary.rejected,
+      reportData.summary.pending,
+      reportData.summary.cancelled
+    ];
+
+    const statusConfig = {
+      type: 'pie',
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          data: statusData,
+          backgroundColor: ['#2E7D32', '#C62828', '#F57C00', '#616161'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { font: { size: 14 }, padding: 15 }
+          },
+          title: {
+            display: true,
+            text: 'Reservation Status Distribution',
+            font: { size: 18, weight: 'bold' },
+            padding: { top: 10, bottom: 30 }
+          }
+        }
+      }
+    };
+
+    charts.statusPie = await chartJSNodeCanvas.renderToDataURL(statusConfig);
+
+    const resourcesWithBookings = reportData.resource_utilization.filter(r => r.booking_count > 0);
+    const topResources = resourcesWithBookings.slice(0, 15);
+    const resourceLabels = topResources.map(r => r.resource_name);
+    const resourceBookings = topResources.map(r => r.booking_count);
+
+    const resourceConfig = {
+      type: 'bar',
+      data: {
+        labels: resourceLabels,
+        datasets: [{
+          label: 'Number of Bookings',
+          data: resourceBookings,
+          backgroundColor: '#8B0000',
+          borderColor: '#6B0000',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: `Most Booked Resources (${resourcesWithBookings.length} booked / ${reportData.resource_utilization.length} total)`,
+            font: { size: 18, weight: 'bold' },
+            padding: { top: 10, bottom: 30 }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { font: { size: 12 } }
+          },
+          y: {
+            ticks: { font: { size: 10 } }
+          }
+        }
+      }
+    };
+
+    charts.resourceBar = await chartJSNodeCanvas.renderToDataURL(resourceConfig);
+
+    const trendLabels = reportData.daily_trends.map(d => {
+      const date = new Date(d.date);
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    });
+    const trendTotals = reportData.daily_trends.map(d => d.total);
+    const trendApproved = reportData.daily_trends.map(d => d.approved);
+    const trendRejected = reportData.daily_trends.map(d => d.rejected);
+
+    const trendConfig = {
+      type: 'line',
+      data: {
+        labels: trendLabels,
+        datasets: [
+          {
+            label: 'Total Reservations',
+            data: trendTotals,
+            borderColor: '#1976D2',
+            backgroundColor: 'rgba(25, 118, 210, 0.1)',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Approved',
+            data: trendApproved,
+            borderColor: '#2E7D32',
+            backgroundColor: 'rgba(46, 125, 50, 0.1)',
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Rejected',
+            data: trendRejected,
+            borderColor: '#C62828',
+            backgroundColor: 'rgba(198, 40, 40, 0.1)',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { font: { size: 12 }, padding: 15 }
+          },
+          title: {
+            display: true,
+            text: 'Daily Reservation Trends',
+            font: { size: 18, weight: 'bold' },
+            padding: { top: 10, bottom: 30 }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 12 } }
+          },
+          x: {
+            ticks: { font: { size: 11 } }
+          }
+        }
+      }
+    };
+
+    charts.trendLine = await chartJSNodeCanvas.renderToDataURL(trendConfig);
+
+    const categoryLabels = reportData.category_breakdown.map(c => c.category);
+    const categoryData = reportData.category_breakdown.map(c => c.booking_count);
+
+    const categoryConfig = {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryData,
+          backgroundColor: ['#8B0000', '#0F766E', '#EA580C', '#2563EB', '#7C3AED', '#DB2777'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { font: { size: 14 }, padding: 15 }
+          },
+          title: {
+            display: true,
+            text: 'Bookings by Resource Category',
+            font: { size: 18, weight: 'bold' },
+            padding: { top: 10, bottom: 30 }
+          }
+        }
+      }
+    };
+
+    charts.categoryDoughnut = await chartJSNodeCanvas.renderToDataURL(categoryConfig);
+
+    console.log('✅ All charts generated successfully');
+    return charts;
+
+  } catch (error) {
+    console.error('❌ Error generating charts:', error);
+    return {};
+  }
+}
+
+*/
+
+
 async function generateCharts(reportData) {
   const charts = {};
 
-  let browser;
   try {
-    const browserConfig = await getBrowserConfig();
+    const browserConfig = getBrowserConfig();
     console.log('🚀 Launching browser for chart generation');
     console.log('   Executable path:', browserConfig.executablePath);
-    
-    browser = await puppeteer.launch(browserConfig);
+    const browser = await puppeteer.launch(browserConfig);
+
     const page = await browser.newPage();
     await page.setViewport({ width: 800, height: 600 });
-
-    // Helper function to generate chart with better error handling
-    const generateChart = async (htmlContent, chartName) => {
-      try {
-        console.log(`📊 Generating ${chartName}...`);
-        
-        // Set content and wait for DOM to be ready
-        await page.setContent(htmlContent, { 
-          waitUntil: 'domcontentloaded',
-          timeout: 45000 
-        });
-        
-        // Wait for Plotly to be available
-        await page.waitForFunction(
-          () => typeof window.Plotly !== 'undefined',
-          { timeout: 15000 }
-        );
-        
-        // Wait for chart div to exist
-        await page.waitForSelector('#chart', { timeout: 10000 });
-        
-        // Wait for Plotly to finish rendering
-        await page.waitForFunction(
-          () => {
-            const chartDiv = document.querySelector('#chart');
-            return chartDiv && chartDiv.querySelector('.plotly');
-          },
-          { timeout: 15000 }
-        );
-        
-        // Additional buffer for animation completion
-        await page.waitForTimeout(1500);
-        
-        // Take screenshot with higher quality
-        const screenshot = await page.screenshot({ 
-          encoding: 'base64',
-          type: 'png',
-          omitBackground: false,
-          fullPage: false
-        });
-        
-        console.log(`✅ ${chartName} generated (${screenshot.length} chars)`);
-        return screenshot;
-        
-      } catch (error) {
-        console.error(`❌ Failed to generate ${chartName}:`, error.message);
-        throw error;
-      }
-    };
 
     // Status Pie Chart
     const statusHTML = `
@@ -379,43 +498,39 @@ async function generateCharts(reportData) {
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-        <style>
-          body { margin: 0; padding: 20px; background: white; }
-          #chart { width: 800px; height: 400px; }
-        </style>
       </head>
-      <body>
+      <body style="margin:0;padding:20px;background:white;">
         <div id="chart"></div>
         <script>
-          window.addEventListener('load', function() {
-            const data = [{
-              values: [${reportData.summary.approved}, ${reportData.summary.rejected}, ${reportData.summary.pending}, ${reportData.summary.cancelled}],
-              labels: ['Approved', 'Rejected', 'Pending', 'Cancelled'],
-              type: 'pie',
-              marker: {
-                colors: ['#2E7D32', '#C62828', '#F57C00', '#616161']
-              }
-            }];
-            
-            const layout = {
-              title: {
-                text: 'Reservation Status Distribution',
-                font: { size: 18, weight: 'bold' }
-              },
-              showlegend: true,
-              legend: { orientation: 'v', x: 1, y: 1 },
-              width: 800,
-              height: 400
-            };
-            
-            Plotly.newPlot('chart', data, layout, {displayModeBar: false});
-          });
+          const data = [{
+            values: [${reportData.summary.approved}, ${reportData.summary.rejected}, ${reportData.summary.pending}, ${reportData.summary.cancelled}],
+            labels: ['Approved', 'Rejected', 'Pending', 'Cancelled'],
+            type: 'pie',
+            marker: {
+              colors: ['#2E7D32', '#C62828', '#F57C00', '#616161']
+            }
+          }];
+          
+          const layout = {
+            title: {
+              text: 'Reservation Status Distribution',
+              font: { size: 18, weight: 'bold' }
+            },
+            showlegend: true,
+            legend: { orientation: 'v', x: 1, y: 1 },
+            width: 800,
+            height: 400
+          };
+          
+          Plotly.newPlot('chart', data, layout, {displayModeBar: false});
         </script>
       </body>
       </html>
     `;
     
-    charts.statusPie = await generateChart(statusHTML, 'Status Pie Chart');
+    await page.setContent(statusHTML, { waitUntil: 'networkidle0' });
+    await page.waitForTimeout(500);
+    charts.statusPie = await page.screenshot({ encoding: 'base64' });
 
     // Resource Bar Chart
     const resourcesWithBookings = reportData.resource_utilization.filter(r => r.booking_count > 0);
@@ -428,43 +543,39 @@ async function generateCharts(reportData) {
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-        <style>
-          body { margin: 0; padding: 20px; background: white; }
-          #chart { width: 800px; height: 600px; }
-        </style>
       </head>
-      <body>
+      <body style="margin:0;padding:20px;background:white;">
         <div id="chart"></div>
         <script>
-          window.addEventListener('load', function() {
-            const data = [{
-              y: ${JSON.stringify(resourceLabels)},
-              x: ${JSON.stringify(resourceBookings)},
-              type: 'bar',
-              orientation: 'h',
-              marker: { color: '#8B0000' }
-            }];
-            
-            const layout = {
-              title: {
-                text: 'Most Booked Resources (${resourcesWithBookings.length} booked / ${reportData.resource_utilization.length} total)',
-                font: { size: 18, weight: 'bold' }
-              },
-              xaxis: { title: 'Number of Bookings' },
-              yaxis: { automargin: true },
-              width: 800,
-              height: 600,
-              margin: { l: 150, r: 50, t: 80, b: 50 }
-            };
-            
-            Plotly.newPlot('chart', data, layout, {displayModeBar: false});
-          });
+          const data = [{
+            y: ${JSON.stringify(resourceLabels)},
+            x: ${JSON.stringify(resourceBookings)},
+            type: 'bar',
+            orientation: 'h',
+            marker: { color: '#8B0000' }
+          }];
+          
+          const layout = {
+            title: {
+              text: 'Most Booked Resources (${resourcesWithBookings.length} booked / ${reportData.resource_utilization.length} total)',
+              font: { size: 18, weight: 'bold' }
+            },
+            xaxis: { title: 'Number of Bookings' },
+            yaxis: { automargin: true },
+            width: 800,
+            height: 600,
+            margin: { l: 150, r: 50, t: 80, b: 50 }
+          };
+          
+          Plotly.newPlot('chart', data, layout, {displayModeBar: false});
         </script>
       </body>
       </html>
     `;
     
-    charts.resourceBar = await generateChart(resourceHTML, 'Resource Bar Chart');
+    await page.setContent(resourceHTML, { waitUntil: 'networkidle0' });
+    await page.waitForTimeout(500);
+    charts.resourceBar = await page.screenshot({ encoding: 'base64' });
 
     // Daily Trends Line Chart
     const trendLabels = reportData.daily_trends.map(d => {
@@ -480,62 +591,58 @@ async function generateCharts(reportData) {
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-        <style>
-          body { margin: 0; padding: 20px; background: white; }
-          #chart { width: 800px; height: 400px; }
-        </style>
       </head>
-      <body>
+      <body style="margin:0;padding:20px;background:white;">
         <div id="chart"></div>
         <script>
-          window.addEventListener('load', function() {
-            const data = [
-              {
-                x: ${JSON.stringify(trendLabels)},
-                y: ${JSON.stringify(trendTotals)},
-                name: 'Total Reservations',
-                type: 'scatter',
-                mode: 'lines+markers',
-                line: { color: '#1976D2', width: 2 },
-                fill: 'tozeroy'
-              },
-              {
-                x: ${JSON.stringify(trendLabels)},
-                y: ${JSON.stringify(trendApproved)},
-                name: 'Approved',
-                type: 'scatter',
-                mode: 'lines+markers',
-                line: { color: '#2E7D32', width: 2 }
-              },
-              {
-                x: ${JSON.stringify(trendLabels)},
-                y: ${JSON.stringify(trendRejected)},
-                name: 'Rejected',
-                type: 'scatter',
-                mode: 'lines+markers',
-                line: { color: '#C62828', width: 2 }
-              }
-            ];
-            
-            const layout = {
-              title: {
-                text: 'Daily Reservation Trends',
-                font: { size: 18, weight: 'bold' }
-              },
-              xaxis: { title: 'Date' },
-              yaxis: { title: 'Number of Reservations' },
-              width: 800,
-              height: 400
-            };
-            
-            Plotly.newPlot('chart', data, layout, {displayModeBar: false});
-          });
+          const data = [
+            {
+              x: ${JSON.stringify(trendLabels)},
+              y: ${JSON.stringify(trendTotals)},
+              name: 'Total Reservations',
+              type: 'scatter',
+              mode: 'lines+markers',
+              line: { color: '#1976D2', width: 2 },
+              fill: 'tozeroy'
+            },
+            {
+              x: ${JSON.stringify(trendLabels)},
+              y: ${JSON.stringify(trendApproved)},
+              name: 'Approved',
+              type: 'scatter',
+              mode: 'lines+markers',
+              line: { color: '#2E7D32', width: 2 }
+            },
+            {
+              x: ${JSON.stringify(trendLabels)},
+              y: ${JSON.stringify(trendRejected)},
+              name: 'Rejected',
+              type: 'scatter',
+              mode: 'lines+markers',
+              line: { color: '#C62828', width: 2 }
+            }
+          ];
+          
+          const layout = {
+            title: {
+              text: 'Daily Reservation Trends',
+              font: { size: 18, weight: 'bold' }
+            },
+            xaxis: { title: 'Date' },
+            yaxis: { title: 'Number of Reservations' },
+            width: 800,
+            height: 400
+          };
+          
+          Plotly.newPlot('chart', data, layout, {displayModeBar: false});
         </script>
       </body>
       </html>
     `;
     
-    charts.trendLine = await generateChart(trendHTML, 'Trend Line Chart');
+    await page.setContent(trendHTML, { waitUntil: 'networkidle0' });
+    await page.waitForTimeout(500);
+    charts.trendLine = await page.screenshot({ encoding: 'base64' });
 
     // Category Doughnut Chart
     const categoryLabels = reportData.category_breakdown.map(c => c.category);
@@ -546,50 +653,46 @@ async function generateCharts(reportData) {
       <html>
       <head>
         <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
-        <style>
-          body { margin: 0; padding: 20px; background: white; }
-          #chart { width: 800px; height: 400px; }
-        </style>
       </head>
-      <body>
+      <body style="margin:0;padding:20px;background:white;">
         <div id="chart"></div>
         <script>
-          window.addEventListener('load', function() {
-            const data = [{
-              values: ${JSON.stringify(categoryData)},
-              labels: ${JSON.stringify(categoryLabels)},
-              type: 'pie',
-              hole: 0.4,
-              marker: {
-                colors: ['#8B0000', '#0F766E', '#EA580C', '#2563EB', '#7C3AED', '#DB2777']
-              }
-            }];
-            
-            const layout = {
-              title: {
-                text: 'Bookings by Resource Category',
-                font: { size: 18, weight: 'bold' }
-              },
-              showlegend: true,
-              legend: { orientation: 'v', x: 1, y: 1 },
-              width: 800,
-              height: 400
-            };
-            
-            Plotly.newPlot('chart', data, layout, {displayModeBar: false});
-          });
+          const data = [{
+            values: ${JSON.stringify(categoryData)},
+            labels: ${JSON.stringify(categoryLabels)},
+            type: 'pie',
+            hole: 0.4,
+            marker: {
+              colors: ['#8B0000', '#0F766E', '#EA580C', '#2563EB', '#7C3AED', '#DB2777']
+            }
+          }];
+          
+          const layout = {
+            title: {
+              text: 'Bookings by Resource Category',
+              font: { size: 18, weight: 'bold' }
+            },
+            showlegend: true,
+            legend: { orientation: 'v', x: 1, y: 1 },
+            width: 800,
+            height: 400
+          };
+          
+          Plotly.newPlot('chart', data, layout, {displayModeBar: false});
         </script>
       </body>
       </html>
     `;
     
-    charts.categoryDoughnut = await generateChart(categoryHTML, 'Category Doughnut Chart');
+    await page.setContent(categoryHTML, { waitUntil: 'networkidle0' });
+    await page.waitForTimeout(500);
+    charts.categoryDoughnut = await page.screenshot({ encoding: 'base64' });
+
+    await browser.close();
 
     // Convert base64 to data URLs
     for (const key in charts) {
-      if (charts[key] && !charts[key].startsWith('data:')) {
-        charts[key] = `data:image/png;base64,${charts[key]}`;
-      }
+      charts[key] = `data:image/png;base64,${charts[key]}`;
     }
 
     console.log('✅ All charts generated successfully (Plotly method)');
@@ -597,12 +700,15 @@ async function generateCharts(reportData) {
 
   } catch (error) {
     console.error('❌ Error generating charts:', error);
-    console.error('   Error details:', error.stack);
+    console.error('   Attempted Chrome path:', getBrowserConfig().executablePath);
+    console.error('   Available paths checked:', [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      process.env.CHROME_BIN,
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/google-chrome',
+    ].filter(Boolean));
     return {};
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
@@ -1069,14 +1175,14 @@ function generateHTMLTemplate(data, charts) {
     <div class="two-column">
       <div class="column">
         <div class="chart-container">
-          <img src="${charts.statusPie || ''}" alt="Status Distribution" style="max-height: 260pt;" />
+          <img src="${charts.statusPie}" alt="Status Distribution" style="max-height: 260pt;" />
           <p class="chart-caption">Figure 1: Overall Status Distribution</p>
         </div>
       </div>
       
       <div class="column">
         <div class="chart-container">
-          <img src="${charts.categoryDoughnut || ''}" alt="Category Breakdown" style="max-height: 260pt;" />
+          <img src="${charts.categoryDoughnut}" alt="Category Breakdown" style="max-height: 260pt;" />
           <p class="chart-caption">Figure 2: Bookings by Resource Category</p>
         </div>
       </div>
@@ -1084,7 +1190,7 @@ function generateHTMLTemplate(data, charts) {
 
     <div class="chart-wrapper">
       <div class="chart-container">
-        <img src="${charts.trendLine || ''}" alt="Daily Trends" style="max-height: 280pt;" />
+        <img src="${charts.trendLine}" alt="Daily Trends" style="max-height: 280pt;" />
         <p class="chart-caption">Figure 3: Daily Reservation Activity Throughout ${data.period.display}</p>
       </div>
     </div>
@@ -1148,7 +1254,7 @@ function generateHTMLTemplate(data, charts) {
 
     <div class="chart-wrapper">
       <div class="chart-container">
-        <img src="${charts.resourceBar || ''}" alt="Top Resources" style="max-height: 300pt;" />
+        <img src="${charts.resourceBar}" alt="Top Resources" style="max-height: 300pt;" />
         <p class="chart-caption">Figure 4: Most Utilized Resources (Complete list in table below)</p>
       </div>
     </div>
@@ -1251,7 +1357,7 @@ function generateHTMLTemplate(data, charts) {
     </table>
   </div>
 
-  <!-- ADMIN PERFORMANCE ANALYSIS -->
+  <!-- NEW: ADMIN PERFORMANCE ANALYSIS -->
   ${data.admin_performance && data.admin_performance.length > 0 ? `
   <div class="page-break-before"></div>
 
