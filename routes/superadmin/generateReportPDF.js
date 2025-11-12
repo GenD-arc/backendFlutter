@@ -61,52 +61,29 @@ router.get("/pdf", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ PDF generation with puppeteer-core
+// ✅ PDF generation with puppeteer-core (Updated for Render.com)
 async function generatePDFWithPuppeteer(htmlContent) {
   let browser;
   try {
     const puppeteer = require('puppeteer-core');
-    const fs = require('fs');
 
-    // Chrome paths for different environments
-    const chromePaths = [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      process.env.CHROME_BIN,
-      '/usr/bin/google-chrome-stable',
-      '/usr/bin/google-chrome', 
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium',
-      '/snap/bin/chromium'
-    ].filter(Boolean);
+    // ✅ Render.com specific configuration
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
 
-    let executablePath;
-    for (const path of chromePaths) {
-      try {
-        if (fs.existsSync(path)) {
-          executablePath = path;
-          console.log(`✅ Using Chrome at: ${path}`);
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    if (!executablePath) {
-      // Fallback - let puppeteer-core find it
-      console.log('⚠️ Using system Chrome detection');
-    }
+    console.log(`✅ Using Chrome at: ${executablePath}`);
 
     const browserConfig = {
       executablePath,
-      headless: 'new',
+      headless: true, // Changed from 'new' to true for better compatibility
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox', 
         '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-software-rasterizer',
-        '--disable-extensions'
+        '--disable-extensions',
+        '--single-process', // Important for Render.com
+        '--no-zygote' // Important for Render.com
       ],
       timeout: 30000
     };
@@ -129,6 +106,7 @@ async function generatePDFWithPuppeteer(htmlContent) {
     });
 
     await browser.close();
+    console.log('✅ PDF generated successfully');
     return pdfBuffer;
 
   } catch (error) {
