@@ -6,6 +6,7 @@ const getBrowserConfig = () => {
   
   // Possible Chrome/Chromium paths (in priority order)
   const chromiumPaths = [
+
     process.env.PUPPETEER_EXECUTABLE_PATH,
     process.env.CHROME_BIN,
     '/usr/bin/google-chrome-stable',
