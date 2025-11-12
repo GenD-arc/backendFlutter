@@ -2,12 +2,20 @@ const express = require("express");
 const router = express.Router();
 const connection = require("../controllers/database");
 
+// Helper to get Philippine time date object
 const getPhilippineDate = () => {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }));
 };
 
+// Helper to get YYYY-MM-DD string in Philippine timezone
 const getPhilippineDateString = (date = new Date()) => {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(date);
+};
+
+// CRITICAL: Compare dates properly in Philippine timezone
+const isSameDatePhilippine = (dateString1, dateString2) => {
+  // Both should already be in YYYY-MM-DD format
+  return dateString1 === dateString2;
 };
 
 router.get("/", async (req, res) => {
@@ -15,12 +23,10 @@ router.get("/", async (req, res) => {
     const today = getPhilippineDate();
     const todayDateString = getPhilippineDateString(today);
 
-    const todayStart = new Date(today);
-    todayStart.setHours(0, 0, 0, 0);
+    console.log("🇵🇭 Current Philippine Time:", today.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+    console.log("📅 Today's Date (Philippine):", todayDateString);
 
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
-
+    // Get all resources
     const resources = await new Promise((resolve, reject) => {
       connection.query(
         "SELECT f_id, f_name, category FROM university_resources",
@@ -31,6 +37,7 @@ router.get("/", async (req, res) => {
       );
     });
 
+    // Get reservations with slots for today ONLY
     const todayReservationsQuery = `
       SELECT 
         r.id as reservation_id,
@@ -43,7 +50,7 @@ router.get("/", async (req, res) => {
         r.status,
         u.name as requester_name,
         r.created_at as requested_date,
-        DATE(rds.slot_date) as slot_date,
+        rds.slot_date,
         rds.start_time,
         rds.end_time,
         TIME_FORMAT(rds.start_time, '%h:%i %p') as formatted_start_time,
@@ -92,6 +99,8 @@ router.get("/", async (req, res) => {
       );
     });
 
+    console.log(`📊 Found ${todayReservations.length} reservations for today (${todayDateString})`);
+
     const availabilityStatus = {
       fully_available: [],
       partially_available: [],
@@ -102,6 +111,7 @@ router.get("/", async (req, res) => {
     const resourceReservations = {};
     const processedReservations = new Set();
 
+    // Process reservations
     for (const reservation of todayReservations) {
       const resourceId = reservation.f_id;
 
@@ -109,9 +119,18 @@ router.get("/", async (req, res) => {
         resourceReservations[resourceId] = [];
       }
       
+      // Convert slot_date to Philippine timezone string
       const slotDateString = reservation.slot_date 
         ? getPhilippineDateString(new Date(reservation.slot_date))
         : null;
+      
+      console.log(`  🔍 Reservation ${reservation.reservation_id}: slot_date=${reservation.slot_date}, converted=${slotDateString}, today=${todayDateString}, match=${slotDateString === todayDateString}`);
+      
+      // CRITICAL: Only process if slot date matches today
+      if (slotDateString !== todayDateString) {
+        console.log(`  ⏭️ Skipping reservation ${reservation.reservation_id} - not for today`);
+        continue;
+      }
       
       const normalizedReservation = {
         ...reservation,
@@ -124,12 +143,14 @@ router.get("/", async (req, res) => {
       const finalApprovalDate = reservation.final_approval_time
         ? getPhilippineDateString(new Date(reservation.final_approval_time))
         : null;
-      const isApprovedToday = finalApprovalDate === todayDateString;
+      const isApprovedToday = isSameDatePhilippine(finalApprovalDate, todayDateString);
 
+      // Only add to daily news if fully approved
       if (isFullyApproved && reservation.status === 'approved') {
         if (!processedReservations.has(reservation.reservation_id)) {
           processedReservations.add(reservation.reservation_id);
           
+          // Get all time slots for this reservation TODAY ONLY
           const todaySlots = todayReservations
             .filter(r => {
               const rSlotDateString = r.slot_date 
@@ -143,6 +164,7 @@ router.get("/", async (req, res) => {
 
           const uniqueSlots = [...new Set(todaySlots)];
           
+          // Get total days for this reservation
           const allSlotsQuery = `
             SELECT DISTINCT DATE(slot_date) as slot_date 
             FROM reservation_daily_slots 
@@ -169,6 +191,8 @@ router.get("/", async (req, res) => {
           const totalDays = uniqueDates.length;
           const currentDayNumber = uniqueDates.indexOf(todayDateString) + 1;
 
+          console.log(`  ✅ Adding to daily news: ${reservation.resource_name} - Day ${currentDayNumber}/${totalDays}`);
+
           dailyNews.push({
             reservation_id: reservation.reservation_id,
             resource_name: reservation.resource_name,
@@ -178,13 +202,14 @@ router.get("/", async (req, res) => {
             requester: reservation.requester_name,
             approved_today: isApprovedToday,
             approval_steps: `${reservation.approved_steps}/${reservation.total_steps_required}`,
-            day_number: currentDayNumber,
+            day_number: currentDayNumber > 0 ? currentDayNumber : 1,
             total_days: totalDays
           });
         }
       }
     }
 
+    // Process availability status
     resources.forEach(resource => {
       const resourceId = resource.f_id;
       const reservations = resourceReservations[resourceId] || [];
@@ -270,12 +295,21 @@ router.get("/", async (req, res) => {
         total_reservations_today: todayReservations.length
       },
       debug_info: {
+        current_philippine_time: today.toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+        today_date_string: todayDateString,
         resources_found: resources.length,
-        reservations_processed: todayReservations.length,
+        reservations_queried: todayReservations.length,
+        reservations_for_today: dailyNews.length,
         timezone_used: "Asia/Manila (UTC+8)",
-        hierarchical_system: "Reservation approved only when all workflow steps are approved"
+        note: "Only showing reservations with slots dated for TODAY in Philippine timezone"
       }
     };
+
+    console.log("✅ Response summary:", {
+      today: todayDateString,
+      total_news_items: dailyNews.length,
+      total_reservations_processed: todayReservations.length
+    });
 
     res.json(response);
   } catch (error) {
