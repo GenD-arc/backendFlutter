@@ -308,7 +308,7 @@ async function fetchReportData(month, year) {
       top_requesters: topRequesters,
       department_breakdown: departmentBreakdown,
       admin_performance: adminPerformance,
-      generated_at: new Date().toISOString(),
+      generated_at: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString(),
     };
 
   } catch (error) {
