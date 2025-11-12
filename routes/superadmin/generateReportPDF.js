@@ -207,6 +207,7 @@ async function fetchReportData(month, year) {
 
     const categoryBreakdown = await queryPromise(categoryBreakdownQuery, [startDate, endDate]);
 
+    // ✅ FIXED: Removed the 'r.' prefix from created_at
     const dailyTrendsQuery = `
       SELECT 
         DATE(created_at) as date,
@@ -214,7 +215,7 @@ async function fetchReportData(month, year) {
         SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
         SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
       FROM reservations
-      WHERE created_at >= ? AND r.created_at <= ?
+      WHERE created_at >= ? AND created_at <= ?
       GROUP BY DATE(created_at)
       ORDER BY date ASC
     `;
