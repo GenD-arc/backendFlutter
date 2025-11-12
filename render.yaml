@@ -1,19 +1,17 @@
 services:
   - type: web
-    name: mseuf-reservation-system
+    name: mseuf-reservation-backend
     env: node
-    buildCommand: |
-      echo "📦 Installing system dependencies..."
-      apt-get update
-      apt-get install -y chromium fonts-liberation
-      echo "📦 Installing npm packages..."
-      npm install
-      echo "🌐 Installing Chrome for Puppeteer..."
-      npx puppeteer browsers install chrome || echo "Using system Chromium"
-      echo "✅ Build complete!"
+    region: singapore
+    plan: starter
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/chromium
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: false
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/.cache/puppeteer
+    # Ensure Puppeteer Chrome is cached
+    autoDeploy: true
